@@ -85,8 +85,7 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 // followed by data rows, all CSV. The section ends at the next [Section]
 // header or EOF.
 func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
-	startLine := p.lineNumber()
-	raw, err := collectSection(p)
+	raw, startLine, err := collectSection(p)
 	if err != nil {
 		return err
 	}
@@ -116,11 +115,7 @@ func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
 		}
 	}
 	for rowNum, row := range records[1:] {
-		sample, err := v1RowToSample(row, header, colIdx, startLine+rowNum+1)
-		if err != nil {
-			return err
-		}
-		sheet.Data = append(sheet.Data, sample)
+		sheet.Data = append(sheet.Data, v1RowToSample(row, header, colIdx, startLine+rowNum+1))
 	}
 	return nil
 }
@@ -181,8 +176,7 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 // effectively implements and is what users editing a sheet by hand
 // usually expect.
 func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
-	startLine := p.lineNumber()
-	raw, err := collectSection(p)
+	raw, startLine, err := collectSection(p)
 	if err != nil {
 		return err
 	}
@@ -220,10 +214,14 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 				value = v
 			}
 		}
-		switch key {
-		case "Adapter":
+		// Key lookup is case-insensitive. The IEM spec uses
+		// canonical case (Adapter, AdapterRead2) but real-world
+		// sheets sometimes use lowercase, and the v1 path is
+		// already case-insensitive — we want a consistent story.
+		switch strings.ToLower(key) {
+		case "adapter":
 			sheet.Settings.Adapter = value
-		case "AdapterRead2":
+		case "adapterread2":
 			sheet.Settings.AdapterRead2 = value
 		default:
 			if sheet.Settings.Extra == nil {
@@ -237,9 +235,14 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 
 // parseManifestsSection reads a [Manifests] section. IEM allows a single
 // column of manifest identifiers (A, B, ...). Some real-world sheets
-// have a header row that duplicates the column letters; we treat any
-// row whose single field is just a column letter as a header to skip.
+// emit a header row that duplicates the column letter (a literal "A");
+// we skip that row when it is followed by at least one more
+// non-empty, non-comment line in the section, which is a good
+// approximation of "this row is a header because there's actual data
+// after it."
 func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
+	// Collect the section's raw lines so we can look ahead.
+	var raw []string
 	for {
 		line, ok := p.peek(0)
 		if !ok {
@@ -253,12 +256,15 @@ func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
 			p.next()
 			continue
 		}
+		raw = append(raw, trimmed)
 		p.next()
-		// Skip a literal "A" header line; treat anything else as a row.
-		if trimmed == "A" && len(sheet.Manifests) == 0 {
-			continue
-		}
-		m := model.Manifest{A: trimmed}
+	}
+	// Detect and drop a single leading "A" header row.
+	if len(raw) >= 2 && raw[0] == "A" {
+		raw = raw[1:]
+	}
+	for _, line := range raw {
+		m := model.Manifest{A: line}
 		sheet.Manifests = append(sheet.Manifests, m)
 	}
 	return nil
@@ -270,7 +276,7 @@ func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
 func parseUnknownSection(p *lineParser, sheet *model.SampleSheet, rawHeader string) error {
 	name := sectionName(rawHeader)
 	// Collect the raw lines first, then decide whether to parse as CSV.
-	raw, err := collectSection(p)
+	raw, startLine, err := collectSection(p)
 	if err != nil {
 		return err
 	}
@@ -282,7 +288,7 @@ func parseUnknownSection(p *lineParser, sheet *model.SampleSheet, rawHeader stri
 		sheet.Extra[name] = sec
 		return nil
 	}
-	records, err := readCSV(raw, p.lineNumber()-len(raw))
+	records, err := readCSV(raw, startLine)
 	if err != nil {
 		return err
 	}
@@ -302,24 +308,32 @@ func parseUnknownSection(p *lineParser, sheet *model.SampleSheet, rawHeader stri
 	return nil
 }
 
-// collectSection gathers the raw lines belonging to the current section
-// (i.e. everything up to the next [Section] header or EOF), skipping
-// blank lines and comments. The cursor is advanced past the section
-// contents but NOT past the next section header.
-func collectSection(p *lineParser) ([]string, error) {
+// collectSection gathers the raw lines belonging to the current
+// section (i.e. everything up to the next [Section] header or EOF),
+// skipping blank lines and comments. The cursor is advanced past the
+// section contents but NOT past the next section header. The returned
+// startLine is the 1-based line number of the first non-blank,
+// non-comment line in the section; callers pass it to readCSV so
+// that error messages point at the right source line even when a
+// section begins with blank or comment lines.
+func collectSection(p *lineParser) ([]string, int, error) {
 	var raw []string
+	startLine := 0
 	for {
 		line, ok := p.peek(0)
 		if !ok {
-			return raw, nil
+			return raw, startLine, nil
 		}
 		trimmed := strings.TrimSpace(line)
 		if isSectionHeader(trimmed) {
-			return raw, nil
+			return raw, startLine, nil
 		}
 		if trimmed == "" || comment(trimmed) {
 			p.next()
 			continue
+		}
+		if startLine == 0 {
+			startLine = p.lineNumber()
 		}
 		raw = append(raw, line)
 		p.next()

@@ -94,12 +94,6 @@ func (e *ParseError) Error() string {
 	return e.Msg
 }
 
-// Is allows errors.Is to match *ParseError values.
-func (e *ParseError) Is(target error) bool {
-	_, ok := target.(*ParseError)
-	return ok
-}
-
 // stripBOM removes a leading UTF-8 byte-order mark if present.
 func stripBOM(b []byte) string {
 	const bom = "\uFEFF"
@@ -141,7 +135,7 @@ func stripBlankLines(lines []string) []string {
 func isV2(lines []string) bool {
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
-		if t == "" || strings.HasPrefix(t, "#") {
+		if t == "" || comment(t) {
 			continue
 		}
 		return isSectionHeader(t)
@@ -249,39 +243,11 @@ func (p *lineParser) eof() bool {
 	return p.pos >= len(p.lines)
 }
 
-// findNextSection returns the index of the next [Section] header at or
-// after the current position, or len(p.lines) if there is none.
-//
-//nolint:unused // retained for future use
-func (p *lineParser) findNextSection() int {
-	for i := p.pos; i < len(p.lines); i++ {
-		if isSectionHeader(strings.TrimSpace(p.lines[i])) {
-			return i
-		}
-	}
-	return len(p.lines)
-}
-
-// peekIsNextSection reports whether the next non-blank, non-comment
-// line is a [Section] header.
-//
-//nolint:unused // retained for future use
-func (p *lineParser) peekIsNextSection() bool {
-	for i := p.pos; i < len(p.lines); i++ {
-		t := strings.TrimSpace(p.lines[i])
-		if t == "" || strings.HasPrefix(t, "#") {
-			continue
-		}
-		return isSectionHeader(t)
-	}
-	return false
-}
-
 // skipBlankAndComments advances past blank and comment lines.
 func (p *lineParser) skipBlankAndComments() {
 	for p.pos < len(p.lines) {
 		t := strings.TrimSpace(p.lines[p.pos])
-		if t == "" || strings.HasPrefix(t, "#") {
+		if t == "" || comment(t) {
 			p.pos++
 			continue
 		}

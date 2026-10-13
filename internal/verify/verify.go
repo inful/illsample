@@ -65,12 +65,9 @@ type Location struct {
 // "Data[2].Sample_ID" or "Reads" or "Sheet".
 func (l Location) String() string {
 	var b strings.Builder
-	switch l.Section {
-	case "":
+	if l.Section == "" {
 		b.WriteString("Sheet")
-	case "Data", "Reads", "Settings", "Manifests":
-		b.WriteString(l.Section)
-	default:
+	} else {
 		b.WriteString(l.Section)
 	}
 	if l.Section != "" && l.Row >= 0 {
@@ -244,12 +241,14 @@ func isValidIndex(s string) bool {
 }
 
 // hasInvalidNameChars reports whether s contains any character that
-// bcl2fastq will refuse. The actual restriction is undocumented but
-// empirically includes whitespace, '/', '\\', and characters outside
-// printable ASCII.
+// bcl2fastq will refuse. Empirically the restriction is: no control
+// characters and no whitespace. Characters like '/' and '\\' are NOT
+// rejected by bcl2fastq 2.20, but they can confuse downstream
+// pipelines that build filesystem paths from the Sample_Name, so
+// callers that care should enforce a stricter policy themselves.
 func hasInvalidNameChars(s string) bool {
 	for _, r := range s {
-		if r < 0x20 || r > 0x7e {
+		if r < 0x20 || r == 0x7f {
 			return true
 		}
 		if r == ' ' || r == '\t' {

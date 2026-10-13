@@ -87,6 +87,7 @@ func main() {
 
 ```bash
 # Validate a sheet; exit 0 on success, 1 on errors, 2 on usage errors.
+# Diagnostics go to stderr; the summary line goes to stdout.
 illsample validate SampleSheet.csv
 
 # Strict mode: treat warnings as errors.

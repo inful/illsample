@@ -54,6 +54,14 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 	}
 
 	header := records[0]
+	// Trim whitespace from header values. Without this, a header
+	// like "Sample_ID, Sample_Name ,..." stores " Sample_Name "
+	// in the column-index map; the writer's case-insensitive lookup
+	// would then fail to match the typed-field case and emit an
+	// empty cell, losing the data on round-trip.
+	for i, h := range header {
+		header[i] = strings.TrimSpace(h)
+	}
 	// Build the column index. Lowercased name -> column position. The
 	// original header is preserved on the SampleSheet so the writer can
 	// emit columns in their original order.
@@ -77,19 +85,16 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 	}
 
 	for rowNum, row := range records[1:] {
-		sample, err := v1RowToSample(row, header, colIdx, rowNum+2)
-		if err != nil {
-			return nil, err
-		}
-		sheet.Data = append(sheet.Data, sample)
+		sheet.Data = append(sheet.Data, v1RowToSample(row, header, colIdx, rowNum+2))
 	}
 	return sheet, nil
 }
 
-// v1RowToSample converts one CSV row into a Sample, mapping known columns
-// to typed fields and preserving the rest in Extra. line is the 1-based
-// source line, used only for error messages.
-func v1RowToSample(row []string, header []string, colIdx map[string]int, line int) (model.Sample, error) {
+// v1RowToSample converts one CSV row into a Sample, mapping known
+// columns to typed fields and preserving the rest in Extra. line is
+// the 1-based source line; it is stored on Sample.SourceRow so
+// downstream code can produce accurate diagnostic messages.
+func v1RowToSample(row []string, header []string, colIdx map[string]int, line int) model.Sample {
 	s := model.Sample{SourceRow: line - 1}
 	for lcName, col := range colIdx {
 		if col >= len(row) {
@@ -110,5 +115,5 @@ func v1RowToSample(row []string, header []string, colIdx map[string]int, line in
 		}
 		s.Extra[origName] = value
 	}
-	return s, nil
+	return s
 }

@@ -6,6 +6,12 @@
 // is symmetric to the parser: every column or section that the parser
 // preserved (e.g. in sheet.Header or sheet.Extra) is written back so
 // that a round-trip is lossless for well-formed input.
+//
+// Note on line endings: this package emits LF, whereas IEM produces
+// CRLF. bcl2fastq and DRAGEN tolerate both, and the parser accepts
+// both, so this is a stylistic deviation only — byte-identical
+// round-trips are not guaranteed for CRLF inputs. If you need CRLF
+// output, post-process the writer's output.
 package writer
 
 import (

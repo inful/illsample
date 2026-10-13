@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/inful/illsample"
@@ -72,6 +72,11 @@ func main() {
 }
 
 // runValidate implements the "validate" subcommand.
+//
+// Output goes to stderr for diagnostics (errors, warnings) and to
+// stdout for the summary line ("OK: no issues found" or the
+// counts). This means `illsample validate good.csv | sed ...` does
+// not mix error messages into the parsed stream.
 func runValidate(args []string) int {
 	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
 	strict := fs.Bool("strict", false, "treat warnings as errors")
@@ -93,7 +98,7 @@ func runValidate(args []string) int {
 		SuppressWarnings:        *noWarn,
 	}
 	result := illsample.VerifyWithOptions(sheet, opts)
-	printResult(os.Stdout, result, *strict, *noWarn)
+	printResult(os.Stdout, os.Stderr, result, *strict, *noWarn)
 	if result.HasErrors() {
 		return 1
 	}
@@ -119,11 +124,17 @@ func runConvert(args []string) int {
 	}
 	switch strings.ToLower(*format) {
 	case "":
-		// Default: flip.
-		if sheet.Format == illsample.FormatV1 {
+		// Default: flip v1 <-> v2. A programmatically-constructed
+		// sheet (FormatUnknown) is ambiguous: the user must be
+		// explicit about which side of the flip they want.
+		switch sheet.Format {
+		case illsample.FormatV1:
 			sheet.Format = illsample.FormatV2
-		} else {
+		case illsample.FormatV2:
 			sheet.Format = illsample.FormatV1
+		default:
+			fmt.Fprintln(os.Stderr, "convert: sheet format is unknown; specify -f v1 or -f v2")
+			return 2
 		}
 	case "v1":
 		sheet.Format = illsample.FormatV1
@@ -201,58 +212,64 @@ func runInfo(args []string) int {
 	return 0
 }
 
-// extraNames returns the names of unknown sections, sorted.
+// extraNames returns the names of unknown sections, sorted
+// alphabetically. Sorting gives stable output across runs, which
+// matters when the user is comparing two invocations of `illsample
+// info` or copy/pasting into a bug report.
 func extraNames(extra map[string]illsample.Section) []string {
 	names := make([]string, 0, len(extra))
 	for name := range extra {
 		names = append(names, name)
 	}
-	// We could sort, but Go map iteration order is already
-	// randomised, which is fine for human consumption.
+	sort.Strings(names)
 	return names
 }
 
-// loadSheet parses a file from disk. It returns a user-friendly error
-// on failure.
+// loadSheet parses a file from disk. The returned error is wrapped
+// with the file's basename (or "<stdin>" for the `-` path) so the
+// user can tell which file failed when they're looping over many.
 func loadSheet(path string) (*illsample.SampleSheet, error) {
 	if path == "-" {
-		return illsample.Parse(os.Stdin)
+		sheet, err := illsample.Parse(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("<stdin>: %w", err)
+		}
+		return sheet, nil
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 	sheet, err := illsample.Parse(f)
 	if err != nil {
 		var pe *illsample.ParseError
 		if errors.As(err, &pe) {
-			return nil, fmt.Errorf("%s: %w", filepath.Base(path), pe)
+			return nil, fmt.Errorf("%s: %w", path, pe)
 		}
-		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return sheet, nil
 }
 
-// printResult formats a verification result for the terminal.
-// Errors are printed to stderr-like prefix; warnings get a different
-// prefix. The colour-free format is used because we cannot reliably
-// detect a TTY from inside a flag-parsed subcommand on every OS.
-func printResult(w io.Writer, result *illsample.VerificationResult, strict, noWarn bool) {
+// printResult formats a verification result for the terminal. Errors
+// and warnings are written to errOut (typically stderr) so a
+// downstream pipe only sees the summary on stdout.
+func printResult(out io.Writer, errOut io.Writer, result *illsample.VerificationResult, strict, noWarn bool) {
 	if result == nil || result.OK() {
-		_, _ = fmt.Fprintln(w, "OK: no issues found")
+		_, _ = fmt.Fprintln(out, "OK: no issues found")
 		return
 	}
 	if !noWarn {
 		for _, iss := range result.Warnings() {
-			_, _ = fmt.Fprintf(w, "warning %s: %s [%s]\n", iss.Code, iss.Message, iss.Location)
+			_, _ = fmt.Fprintf(errOut, "warning %s: %s [%s]\n", iss.Code, iss.Message, iss.Location)
 		}
 	}
 	for _, iss := range result.Errors() {
-		_, _ = fmt.Fprintf(w, "error %s: %s [%s]\n", iss.Code, iss.Message, iss.Location)
+		_, _ = fmt.Fprintf(errOut, "error %s: %s [%s]\n", iss.Code, iss.Message, iss.Location)
 	}
 	counts := struct{ errors, warnings int }{}
 	counts.errors = len(result.Errors())
 	counts.warnings = len(result.Warnings())
-	_, _ = fmt.Fprintf(w, "summary: %d error(s), %d warning(s) (strict=%v)\n", counts.errors, counts.warnings, strict)
+	_, _ = fmt.Fprintf(out, "summary: %d error(s), %d warning(s) (strict=%v)\n", counts.errors, counts.warnings, strict)
 }
