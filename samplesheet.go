@@ -21,7 +21,7 @@
 //	if err != nil { ... }
 //	result := illsample.Verify(sheet)
 //	if result.HasErrors() { ... }
-//	if err := illsample.Verify(w, sheet); err != nil { ... }
+//	if err := illsample.Write(w, sheet); err != nil { ... }
 package illsample
 
 import (
