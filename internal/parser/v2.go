@@ -3,6 +3,7 @@ package parser
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/inful/illsample/internal/model"
 )
@@ -10,7 +11,19 @@ import (
 // parseV2 parses a v2 (IEM sectioned) sample sheet. The first non-blank
 // line is expected to be a [Section] header; any preceding text is
 // silently ignored (it is sometimes used for human-readable comments).
+// Non-UTF-8 input is rejected with a ParseError so that callers using
+// ParseV2 directly get the same behaviour as callers using the
+// auto-detecting Parse.
 func parseV2(lines []string) (*model.SampleSheet, error) {
+	// Validate the entire line slice as UTF-8. This is a fast pass
+	// over the slice's underlying string (lines is built by
+	// splitLines from a string already validated by ParseBytes; for
+	// direct ParseV2 callers, we re-validate here).
+	for _, line := range lines {
+		if !utf8.ValidString(line) {
+			return nil, &ParseError{Line: 1, Msg: "input is not valid UTF-8"}
+		}
+	}
 	sheet := &model.SampleSheet{
 		Format: model.FormatV2,
 	}
@@ -162,7 +175,11 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 }
 
 // parseSettingsSection reads a [Settings] section, which is a 2-column
-// CSV: the first row is the header, subsequent rows are values.
+// CSV: the first row is the header, subsequent rows are values. When
+// the section contains more than one data row, later rows override
+// earlier ones (last-non-empty wins). This is the behaviour bcl2fastq
+// effectively implements and is what users editing a sheet by hand
+// usually expect.
 func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 	startLine := p.lineNumber()
 	raw, err := collectSection(p)
@@ -192,9 +209,16 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 			// Header without any data row is a no-op.
 			continue
 		}
+		// Walk all data rows; the last non-empty value wins.
 		var value string
-		if col < len(records[1]) {
-			value = strings.TrimSpace(records[1][col])
+		for _, rec := range records[1:] {
+			if col >= len(rec) {
+				continue
+			}
+			v := strings.TrimSpace(rec[col])
+			if v != "" {
+				value = v
+			}
 		}
 		switch key {
 		case "Adapter":

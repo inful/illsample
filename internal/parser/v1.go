@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/inful/illsample/internal/model"
 )
@@ -21,7 +22,7 @@ var knownColumns = map[string]func(*model.Sample, string){
 	"sample_well":    func(s *model.Sample, v string) { s.SampleWell = v },
 	"samplewell":     func(s *model.Sample, v string) { s.SampleWell = v },
 	"i7_index_id":    func(s *model.Sample, v string) { s.I7IndexID = v },
-	"i7indexid":      func(s *model.Sample, v string) { s.I5IndexID = v }, // legacy typo alias
+	"i7indexid":      func(s *model.Sample, v string) { s.I7IndexID = v }, // legacy no-underscore alias
 	"index":          func(s *model.Sample, v string) { s.Index = v },
 	"i5_index_id":    func(s *model.Sample, v string) { s.I5IndexID = v },
 	"i5indexid":      func(s *model.Sample, v string) { s.I5IndexID = v },
@@ -32,8 +33,14 @@ var knownColumns = map[string]func(*model.Sample, string){
 }
 
 // parseV1 parses a v1 sample sheet. data may begin with a UTF-8 BOM.
+// Non-UTF-8 input is rejected with a ParseError so that callers using
+// ParseV1 directly get the same behaviour as callers using the
+// auto-detecting Parse.
 func parseV1(data []byte) (*model.SampleSheet, error) {
 	text := stripBOM(data)
+	if !utf8.ValidString(text) {
+		return nil, &ParseError{Msg: "input is not valid UTF-8"}
+	}
 	r := csv.NewReader(bytes.NewReader([]byte(text)))
 	r.FieldsPerRecord = -1
 	r.LazyQuotes = true

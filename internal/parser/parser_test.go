@@ -300,6 +300,60 @@ func TestParse_OnlyWhitespace(t *testing.T) {
 	}
 }
 
+func TestParseV1_I7IndexIDNoUnderscore(t *testing.T) {
+	// Regression test for CR-01: a v1 sheet with the no-underscore
+	// "I7IndexID" column must place the value in I7IndexID, not in
+	// I5IndexID. Previously the setter was wired to the wrong field,
+	// which would silently send i7 values to the i5 demultiplexing
+	// slot.
+	input := "Sample_ID,Sample_Name,I7IndexID,index,Sample_Project\n" +
+		"id1,name1,UDI001,ATCG,P1\n" +
+		"id2,name2,UDI002,GCTA,P2\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := sheet.Data[0].I7IndexID; got != "UDI001" {
+		t.Errorf("Data[0].I7IndexID = %q, want UDI001", got)
+	}
+	if got := sheet.Data[0].I5IndexID; got != "" {
+		t.Errorf("Data[0].I5IndexID = %q, want empty", got)
+	}
+	if got := sheet.Data[1].I7IndexID; got != "UDI002" {
+		t.Errorf("Data[1].I7IndexID = %q, want UDI002", got)
+	}
+}
+
+func TestParseV1_RejectsNonUTF8(t *testing.T) {
+	// Regression test for HI-03: ParseV1 must reject non-UTF-8 input
+	// with the same behaviour as the auto-detecting Parse. \xff\xfe
+	// is not a valid UTF-8 start byte.
+	input := "Sample_ID,Sample_Name,index,Sample_Project\nid1,name1,\xff\xfeATCG,P1\n"
+	_, err := ParseV1(strings.NewReader(input))
+	if err == nil {
+		t.Fatal("ParseV1: expected error for non-UTF-8 input, got nil")
+	}
+	var pe *ParseError
+	if !errors.As(err, &pe) {
+		t.Errorf("error type = %T, want *ParseError", err)
+	}
+}
+
+func TestParseV2_RejectsNonUTF8(t *testing.T) {
+	input := "[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,\xff\xfeATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n"
+	_, err := ParseV2(strings.NewReader(input))
+	if err == nil {
+		t.Fatal("ParseV2: expected error for non-UTF-8 input, got nil")
+	}
+	var pe *ParseError
+	if !errors.As(err, &pe) {
+		t.Errorf("error type = %T, want *ParseError", err)
+	}
+}
+
 func TestParseV1_RaggedRow(t *testing.T) {
 	input := "Sample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCG,P1,extra\nid2,name2,GCTA\n"
 	sheet, err := Parse(strings.NewReader(input))
@@ -340,6 +394,57 @@ func TestParseV2_EmptySettings(t *testing.T) {
 	// Settings struct so the writer can skip emitting it.
 	if sheet.Settings != nil {
 		t.Errorf("Settings = %+v, want nil for empty section", sheet.Settings)
+	}
+}
+
+func TestParseV2_MultipleSettingsRows(t *testing.T) {
+	// Regression test for HI-02: a [Settings] section with multiple
+	// data rows must not silently drop rows 2+. Later non-empty
+	// values win.
+	input := "[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,ATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n" +
+		"[Settings]\n" +
+		"Adapter,AdapterRead2,CustomKey\n" +
+		"first-adapter,first-read2,first-custom\n" +
+		"second-adapter,second-read2,second-custom\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Settings == nil {
+		t.Fatal("Settings is nil")
+	}
+	if got := sheet.Settings.Adapter; got != "second-adapter" {
+		t.Errorf("Adapter = %q, want second-adapter", got)
+	}
+	if got := sheet.Settings.AdapterRead2; got != "second-read2" {
+		t.Errorf("AdapterRead2 = %q, want second-read2", got)
+	}
+	if got := sheet.Settings.Extra["CustomKey"]; got != "second-custom" {
+		t.Errorf("Extra[CustomKey] = %q, want second-custom", got)
+	}
+}
+
+func TestParseV2_SettingsLastNonEmptyWins(t *testing.T) {
+	// An empty cell in a later row must not overwrite a non-empty
+	// value in an earlier row.
+	input := "[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,ATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n" +
+		"[Settings]\n" +
+		"Adapter\n" +
+		"first\n" +
+		"\n" +
+		"third\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := sheet.Settings.Adapter; got != "third" {
+		t.Errorf("Adapter = %q, want third (empty row must not clobber)", got)
 	}
 }
 

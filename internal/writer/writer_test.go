@@ -339,6 +339,151 @@ func TestWriteV1_HeaderHasAliasAndDataHasCanonical(t *testing.T) {
 	}
 }
 
+func TestWrite_CSVInjectionEscaped(t *testing.T) {
+	// Regression test for CR-02: cells starting with =, +, -, @, \t, or
+	// \r must be escaped with a leading single quote so that Excel /
+	// Google Sheets / LibreOffice do not evaluate them as formulas.
+	cases := []string{
+		"=cmd|'/c calc'!A1",
+		"+1+1",
+		"-2+2",
+		"@SUM(A1:A10)",
+		"\tleading-tab",
+		"\rleading-cr",
+	}
+	for _, dangerous := range cases {
+		t.Run(dangerous, func(t *testing.T) {
+			sheet := &model.SampleSheet{
+				Format: model.FormatV2,
+				Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+				Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+				Data: []model.Sample{
+					{SampleID: "id1", SampleName: dangerous, Index: "ATCGATCG", SampleProject: "P1"},
+				},
+			}
+			var buf bytes.Buffer
+			if err := WriteV2(&buf, sheet); err != nil {
+				t.Fatalf("WriteV2: %v", err)
+			}
+			out := buf.String()
+			// The dangerous value must appear in the output with a
+			// leading single quote. We check for the exact byte
+			// sequence because some shells render tab/cr oddly.
+			if !strings.Contains(out, "'"+dangerous) {
+				t.Errorf("output does not contain escaped value %q\noutput:\n%s", "'"+dangerous, out)
+			}
+		})
+	}
+}
+
+func TestWrite_CSVInjectionSafeValue(t *testing.T) {
+	// A value that does NOT start with a dangerous char must pass
+	// through unchanged. This protects against an over-eager escape.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV1,
+		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "normal_name", Index: "ATCG", SampleProject: "P1"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV1(&buf, sheet); err != nil {
+		t.Fatalf("WriteV1: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "'normal_name") {
+		t.Errorf("normal value was incorrectly escaped:\n%s", out)
+	}
+}
+
+func TestWriteV2_PreservesExtraColumns(t *testing.T) {
+	// Regression test for HI-01: a v2 sheet carrying a custom
+	// column must round-trip the column through the writer.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "CustomColumn"},
+		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Data: []model.Sample{
+			{
+				SampleID:      "id1",
+				SampleName:    "name1",
+				Index:         "ATCGATCG",
+				SampleProject: "P1",
+				Extra:         map[string]string{"CustomColumn": "custom-value"},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "CustomColumn") {
+		t.Errorf("output should contain CustomColumn header:\n%s", out)
+	}
+	if !strings.Contains(out, "custom-value") {
+		t.Errorf("output should contain custom-value row:\n%s", out)
+	}
+	// Round-trip back through the parser to confirm the column is
+	// restored as an unknown column on the Sample.
+	round, err := parser.Parse(&buf)
+	if err != nil {
+		t.Fatalf("Parse round-trip: %v", err)
+	}
+	if got := round.Data[0].Extra["CustomColumn"]; got != "custom-value" {
+		t.Errorf("round.Data[0].Extra[CustomColumn] = %q, want custom-value", got)
+	}
+}
+
+func TestWriteV2_AliasColumnNotDuplicated(t *testing.T) {
+	// A v1 sheet that uses the no-underscore "I7IndexID" alias
+	// should round-trip as the single canonical "I7_Index_ID"
+	// column, not as both the canonical column and the alias.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV1,
+		Header: []string{"Sample_ID", "Sample_Name", "I7IndexID", "index", "Sample_Project"},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "name1", I7IndexID: "UDI001", Index: "ATCG", SampleProject: "P1"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	// Exactly one of {I7_Index_ID, I7IndexID} should appear.
+	count := strings.Count(out, "I7_Index_ID") + strings.Count(out, "I7IndexID")
+	if count != 1 {
+		t.Errorf("output should contain exactly one I7 column reference, got %d:\n%s", count, out)
+	}
+	// The value UDI001 must appear in the row.
+	if !strings.Contains(out, "UDI001") {
+		t.Errorf("output should contain UDI001:\n%s", out)
+	}
+}
+
+func TestWriteV2_PreservesExtraColumnsFromHeaderOnly(t *testing.T) {
+	// A column that appears in the source header but not in any
+	// sample's Extra (i.e. an empty column) must still be emitted so
+	// that the column order is preserved.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "Assay"},
+		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, ",Assay") {
+		t.Errorf("output should contain Assay column in header:\n%s", out)
+	}
+}
+
 func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
 	// A column that is not in the header AND not an alias of a
 	// header column should be appended at the end of the header.

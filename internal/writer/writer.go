@@ -81,7 +81,7 @@ func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
 	for _, sample := range sheet.Data {
 		row := make([]string, len(header))
 		for i, col := range header {
-			row[i] = fieldFor(sample, col)
+			row[i] = csvSafe(fieldFor(sample, col))
 		}
 		if err := cw.Write(row); err != nil {
 			return fmt.Errorf("writer: write row: %w", err)
@@ -105,7 +105,8 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 	if err := writeSectionHeader(&buf, "Data"); err != nil {
 		return err
 	}
-	if err := writeV2Data(&buf, sheet.Data); err != nil {
+	header := v2DataHeader(sheet)
+	if err := writeV2Data(&buf, header, sheet.Data); err != nil {
 		return err
 	}
 
@@ -171,17 +172,75 @@ func writeSectionHeader(buf *bytes.Buffer, name string) error {
 	return nil
 }
 
-// writeV2Data writes the [Data] section of a v2 sheet.
-func writeV2Data(buf *bytes.Buffer, data []model.Sample) error {
+// v2DataHeader computes the column list to emit in the [Data] section.
+// It starts from the canonical v2 column order, then appends any
+// columns from the source header (in source order) that are not already
+// present, then appends any keys from sample.Extra that are not yet
+// included (sorted for determinism). This preserves the round-trip
+// property for sheets that carry DRAGEN- or BaseSpace-specific columns.
+//
+// Both passes skip columns whose lower-cased name is a known alias of a
+// canonical column (e.g. "i7indexid" when "I7_Index_ID" is already
+// present). Without this, a v1 sheet using the no-underscore alias
+// would be round-tripped as two columns: the canonical one and the
+// alias.
+func v2DataHeader(sheet *model.SampleSheet) []string {
+	cols := append([]string(nil), canonicalColumnsV2...)
+	seen := make(map[string]struct{}, len(cols))
+	for _, c := range cols {
+		seen[strings.ToLower(c)] = struct{}{}
+	}
+	// Source-header order: append any column that isn't already there.
+	for _, h := range sheet.Header {
+		key := strings.ToLower(strings.TrimSpace(h))
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		// Recognise aliases of canonical columns. canonicalAlias
+		// returns the canonical name (or the input itself if no
+		// alias is known); if the canonical name is already in
+		// seen, skip the alias column.
+		if _, ok := seen[strings.ToLower(canonicalAlias(h))]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		cols = append(cols, h)
+	}
+	// Any Extra keys across all samples that aren't yet included.
+	var extraKeys []string
+	for _, s := range sheet.Data {
+		for k := range s.Extra {
+			lk := strings.ToLower(k)
+			if _, ok := seen[lk]; ok {
+				continue
+			}
+			if _, ok := seen[strings.ToLower(canonicalAlias(k))]; ok {
+				continue
+			}
+			seen[lk] = struct{}{}
+			extraKeys = append(extraKeys, k)
+		}
+	}
+	sort.Strings(extraKeys)
+	cols = append(cols, extraKeys...)
+	return cols
+}
+
+// writeV2Data writes the [Data] section of a v2 sheet using the given
+// header. The header should already be computed by v2DataHeader.
+func writeV2Data(buf *bytes.Buffer, header []string, data []model.Sample) error {
 	cw := csv.NewWriter(buf)
 	cw.UseCRLF = false
-	if err := cw.Write(canonicalColumnsV2); err != nil {
+	if err := cw.Write(header); err != nil {
 		return err
 	}
 	for _, sample := range data {
-		row := make([]string, len(canonicalColumnsV2))
-		for i, col := range canonicalColumnsV2 {
-			row[i] = fieldFor(sample, col)
+		row := make([]string, len(header))
+		for i, col := range header {
+			row[i] = csvSafe(fieldFor(sample, col))
 		}
 		if err := cw.Write(row); err != nil {
 			return err
@@ -246,14 +305,16 @@ func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
 	}
 	row := make([]string, len(keys))
 	for i, k := range keys {
+		var value string
 		switch k {
 		case "Adapter":
-			row[i] = s.Adapter
+			value = s.Adapter
 		case "AdapterRead2":
-			row[i] = s.AdapterRead2
+			value = s.AdapterRead2
 		default:
-			row[i] = s.Extra[k]
+			value = s.Extra[k]
 		}
+		row[i] = csvSafe(value)
 	}
 	if err := cw.Write(row); err != nil {
 		return err
@@ -264,14 +325,20 @@ func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
 
 // writeV2Manifests writes the [Manifests] section.
 func writeV2Manifests(buf *bytes.Buffer, manifests []model.Manifest) error {
+	cw := csv.NewWriter(buf)
+	cw.UseCRLF = false
 	for _, m := range manifests {
 		// We only write column A; the IEM spec models a single
-		// column of manifest paths.
-		if _, err := fmt.Fprintln(buf, m.A); err != nil {
+		// column of manifest paths. csvSafe is still applied
+		// because a manifest path that starts with =, +, -, or @
+		// would be evaluated as a formula when the file is opened
+		// in a spreadsheet.
+		if err := cw.Write([]string{csvSafe(m.A)}); err != nil {
 			return err
 		}
 	}
-	return nil
+	cw.Flush()
+	return cw.Error()
 }
 
 // writeV2GenericSection writes a section we did not model explicitly.
@@ -282,7 +349,13 @@ func writeV2GenericSection(buf *bytes.Buffer, sec model.Section) error {
 	cw := csv.NewWriter(buf)
 	cw.UseCRLF = false
 	for _, row := range sec.Rows {
-		if err := cw.Write(row); err != nil {
+		// Apply csvSafe to every cell; the rows in Extra come from
+		// arbitrary user-controlled sections.
+		safe := make([]string, len(row))
+		for i, cell := range row {
+			safe[i] = csvSafe(cell)
+		}
+		if err := cw.Write(safe); err != nil {
 			return err
 		}
 	}
@@ -347,7 +420,26 @@ func fieldFor(sample model.Sample, col string) string {
 	return ""
 }
 
-// canonicalAlias maps a v1-style alias to its canonical v2 name.
+// csvSafe escapes a value that may otherwise be interpreted as a
+// formula by Excel, Google Sheets, or LibreOffice. We prepend a single
+// quote (`'`) which those applications treat as a literal-string
+// indicator. encoding/csv does not escape these characters on its own.
+//
+// This is a write-side concern. The parser does not strip the prefix on
+// re-read, so a round-trip leaves the safety character in the model
+// (the application can drop it after parsing if needed).
+//
+// Reference: OWASP "CSV Injection".
+func csvSafe(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + s
+	}
+	return s
+}
 func canonicalAlias(name string) string {
 	switch strings.ToLower(name) {
 	case "sampleid":
