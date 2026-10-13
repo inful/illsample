@@ -1,0 +1,5 @@
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+D1,sample_D1,plate1,A1,N701,TAAGGCGA,S501,AGAGTAGA,P_Dual,dual index 1
+D2,sample_D2,plate1,A2,N702,CGTACTAG,S501,AGAGTAGA,P_Dual,dual index 2
+D3,sample_D3,plate1,A3,N703,AGGCAGAA,S502,GCTAGCTA,P_Dual,dual index 3
+D4,sample_D4,plate1,A4,N704,TCCTGAGC,S502,GCTAGCTA,P_Dual,dual index 4

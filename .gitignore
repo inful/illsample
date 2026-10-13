@@ -1,0 +1,21 @@
+# Binaries
+/illsample
+/cmd/illsample/illsample
+/bin/
+/dist/
+
+# Test artifacts
+*.out
+*.test
+*.prof
+coverage.txt
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Go
+/vendor/

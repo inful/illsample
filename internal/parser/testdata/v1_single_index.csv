@@ -1,0 +1,5 @@
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+Sample_01,sample_one,plate_A,A1,UDI001,ATCGATCG,,,Project_Alpha,first sample
+Sample_02,sample_two,plate_A,A2,UDI002,GCTAGCTA,,,Project_Alpha,second sample
+Sample_03,sample_three,plate_A,A3,UDI003,TTAACCGG,,,Project_Beta,third sample
+Sample_04,sample_four,plate_A,A4,UDI004,CCGGTTAA,,,Project_Beta,

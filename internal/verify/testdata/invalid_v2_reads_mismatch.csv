@@ -1,0 +1,16 @@
+[Data]
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+sample_01,sample_one,plate1,A1,UDI001,ATCGATCG,,,P1,
+sample_02,sample_two,plate1,A2,UDI002,GCTAGCTA,,,P1,
+
+[Reads]
+Read1Cycles
+151
+Read2Cycles
+151
+Index1Cycles
+6
+
+[Settings]
+Adapter
+AGATCGGAAGAGCACACGTCTGAACTCCAGTCA

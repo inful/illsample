@@ -1,0 +1,4 @@
+Sample_ID,Sample_Name,index,Sample_Project
+dup_id,sample_one,ATCG,P1
+other_id,sample_two,GCTA,P1
+dup_id,sample_three,TTAA,P1

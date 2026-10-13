@@ -1,0 +1,50 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck      # unchecked errors
+    - govet         # standard vet
+    - ineffassign   # unused assignments
+    - staticcheck   # comprehensive static analysis (subsumes gosimple)
+    - unused        # unused identifiers
+    - misspell      # spelling
+    - revive        # golint successor
+    - bodyclose     # http body close
+    - nilerr        # returning nil after handling err
+    - nolintlint    # nolint directive usage
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes: github.com/inful/illsample
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: package-comments
+        disabled: false
+      - name: var-naming
+      - name: error-strings
+      - name: error-naming
+      - name: error-return
+      - name: indent-error-flow
+      - name: range
+      - name: receiver-naming
+      - name: time-equal
+      - name: superfluous-else
+      - name: confusing-naming
+
+issues:
+  default: strict
