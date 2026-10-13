@@ -5,18 +5,38 @@ run:
   tests: true
 
 linters:
-  default: none
   enable:
-    - errcheck      # unchecked errors
-    - govet         # standard vet
-    - ineffassign   # unused assignments
-    - staticcheck   # comprehensive static analysis (subsumes gosimple)
-    - unused        # unused identifiers
-    - misspell      # spelling
-    - revive        # golint successor
-    - bodyclose     # http body close
-    - nilerr        # returning nil after handling err
-    - nolintlint    # nolint directive usage
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - revive
+    - bodyclose
+    - nilerr
+    - nolintlint
+  settings:
+    revive:
+      rules:
+        - name: exported
+        - name: package-comments
+        - name: var-naming
+        - name: error-strings
+        - name: error-naming
+        - name: error-return
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-equal
+        - name: superfluous-else
+        # The parseV1/parseV2 internal helpers and the public
+        # ParseV1/ParseV2 entry points differ only by case, which
+        # this rule flags. The naming is intentional (internal
+        # helper vs. public entry point) and renaming the internals
+        # would just add noise.
+        - name: confusing-naming
+          disabled: true
 
 formatters:
   enable:
@@ -26,25 +46,5 @@ formatters:
     gofmt:
       simplify: true
     goimports:
-      local-prefixes: github.com/inful/illsample
-
-linters-settings:
-  revive:
-    rules:
-      - name: exported
-        disabled: false
-      - name: package-comments
-        disabled: false
-      - name: var-naming
-      - name: error-strings
-      - name: error-naming
-      - name: error-return
-      - name: indent-error-flow
-      - name: range
-      - name: receiver-naming
-      - name: time-equal
-      - name: superfluous-else
-      - name: confusing-naming
-
-issues:
-  default: strict
+      local-prefixes:
+        - github.com/inful/illsample

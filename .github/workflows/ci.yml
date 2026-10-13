@@ -20,7 +20,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache: true
+          # No go.sum because this project has zero third-party
+          # dependencies, so the standard Go module cache has
+          # nothing to cache. Disable it to avoid spurious
+          # "Restore cache failed" warnings.
+          cache: false
 
       - name: Verify modules
         run: go mod verify
@@ -59,12 +63,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache: true
+          cache: false
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # Pin to v2 because the project's .golangci.yml is written
+          # for the v2 config schema.
+          version: v2.14.0
           args: --timeout=5m
 
   cross-build:
