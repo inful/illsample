@@ -25,8 +25,15 @@ import (
 	"github.com/inful/illsample"
 )
 
-// version is set via -ldflags at build time.
-var version = "dev"
+// version, commit, and date are set via -ldflags at build time
+// (see .goreleaser.yml). The defaults let `go run` and `go install`
+// work without the build tags; `go install @v0.1.0` and the
+// release binaries will have real values injected.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 const usage = `illsample — parse, validate, and convert Illumina sample sheets
 
@@ -59,7 +66,11 @@ func main() {
 	case "info":
 		os.Exit(runInfo(args))
 	case "version", "-version", "--version":
-		fmt.Println("illsample", version)
+		fmt.Printf("illsample %s\n", version)
+		if commit != "none" {
+			fmt.Printf("  commit: %s\n", commit)
+			fmt.Printf("  built:  %s\n", date)
+		}
 		os.Exit(0)
 	case "help", "-h", "--help", "-help":
 		fmt.Print(usage)

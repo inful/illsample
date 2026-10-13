@@ -1,0 +1,96 @@
+version: 2
+
+project_name: illsample
+
+before:
+  hooks:
+    - go mod tidy
+    - go test -race ./...
+
+builds:
+  - id: illsample
+    main: ./cmd/illsample
+    binary: illsample
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - '386'
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: '386'
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .Commit }}
+      - -X main.date={{ .CommitDate }}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: inful
+    name: illsample
+  prerelease: auto
+  draft: false
+  header: |
+    ## illsample {{ .Tag }}
+
+    Released {{ .Date }}.
+  footer: |
+    ## Installation
+
+    ### Go
+
+    ```sh
+    go install github.com/inful/illsample/cmd/illsample@{{ .Tag }}
+    ```
+
+    ### Download
+
+    Grab the binary for your platform from the assets below.
+  extra_files:
+    - glob: 'LICENSE*'
+    - glob: 'README*'

@@ -1,5 +1,10 @@
 # illsample
 
+[![CI](https://github.com/inful/illsample/actions/workflows/ci.yml/badge.svg)](https://github.com/inful/illsample/actions/workflows/ci.yml)
+[![Release](https://github.com/inful/illsample/actions/workflows/release.yml/badge.svg)](https://github.com/inful/illsample/actions/workflows/release.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/inful/illsample.svg)](https://pkg.go.dev/github.com/inful/illsample)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A Go library and CLI for parsing, writing, and verifying Illumina sample sheets.
 
 Illumina sequencers consume a *sample sheet* — a small CSV-ish file — that tells the
@@ -27,15 +32,30 @@ before they reach the sequencer.
 
 ## Installation
 
-```bash
-go get github.com/inful/illsample
-```
-
-To install the CLI:
+### From source
 
 ```bash
 go install github.com/inful/illsample/cmd/illsample@latest
 ```
+
+### From a release
+
+Pre-built binaries for Linux, macOS, Windows, and FreeBSD (amd64,
+arm64, 386 where supported) are attached to every
+[GitHub release](https://github.com/inful/illsample/releases). Grab
+the archive for your platform, extract it, and put the binary on
+your `PATH`.
+
+```bash
+# Example: Linux amd64
+curl -L -o illsample.tar.gz \
+  https://github.com/inful/illsample/releases/latest/download/illsample_Linux_x86_64.tar.gz
+tar -xzf illsample.tar.gz
+sudo mv illsample /usr/local/bin/
+```
+
+Verify the SHA-256 sum against the `*_SHA256SUMS` file in the same
+release.
 
 ## Quick start
 
