@@ -35,7 +35,7 @@ before they reach the sequencer.
 ### From source
 
 ```bash
-go install github.com/inful/illsample/cmd/illsample@latest
+go install github.com/inful/illsample/cmd/illsample@v0.2.0
 ```
 
 ### From a release
