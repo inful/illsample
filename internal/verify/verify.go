@@ -10,6 +10,7 @@ package verify
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -187,11 +188,13 @@ func VerifyWithOptions(sheet *model.SampleSheet, opts VerifyOptions) *Verificati
 		}}}
 	}
 	r := &VerificationResult{promoteWarnings: opts.PromoteWarningsToErrors}
-	for _, rule := range allRules {
-		if !rule.applies(sheet) {
+	for i := range allRules {
+		rule := &allRules[i]
+		if !slices.Contains(rule.formats, sheet.Format) {
 			continue
 		}
-		rule.check(sheet, r)
+		code := issueCode(rule.severity, sheet.Format, rule.suffix)
+		rule.check(sheet.Format, sheet, code, r)
 	}
 	if opts.SuppressWarnings {
 		r.Issues = filterOut(r.Issues, func(i Issue) bool { return i.Severity == SeverityWarning })
