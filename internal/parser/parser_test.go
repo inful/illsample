@@ -590,6 +590,69 @@ func TestParseV2_SettingsLastNonEmptyWins(t *testing.T) {
 	}
 }
 
+func TestUnescapeCSVSafe(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		// Trigger chars: leading ' is stripped when the next char is a danger.
+		{"'=2+2", "=2+2"},
+		{"'+1+1", "+1+1"},
+		{"'-2+2", "-2+2"},
+		{"'@SUM(A1:A10)", "@SUM(A1:A10)"},
+		{"'\tleading-tab", "\tleading-tab"},
+		{"'\rleading-cr", "\rleading-cr"},
+		// Legitimate leading quote survives.
+		{"'twas the night", "'twas the night"},
+		{"'normal", "'normal"},
+		// Too short to be an escape; left alone.
+		{"'", "'"},
+		{"", ""},
+		// No leading quote; left alone.
+		{"normal", "normal"},
+		{"=2+2", "=2+2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := unescapeCSVSafe(tt.in); got != tt.want {
+				t.Errorf("unescapeCSVSafe(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseV1_StripsCSVInjectionEscape(t *testing.T) {
+	// A v1 sheet whose Sample_Name starts with a formula trigger
+	// (and is therefore escaped to "'=…" by the writer) must round
+	// trip back to the original unescaped value.
+	input := "Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,'=2+2,ATCG,P1\n" +
+		"id2,'@SUM,ATCG,P1\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := sheet.Data[0].SampleName; got != "=2+2" {
+		t.Errorf("Data[0].SampleName = %q, want %q (leading ' should be stripped)", got, "=2+2")
+	}
+	if got := sheet.Data[1].SampleName; got != "@SUM" {
+		t.Errorf("Data[1].SampleName = %q, want %q (leading ' should be stripped)", got, "@SUM")
+	}
+}
+
+func TestParseV2_StripsCSVInjectionEscape(t *testing.T) {
+	input := "[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,'=2+2,ATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := sheet.Data[0].SampleName; got != "=2+2" {
+		t.Errorf("Data[0].SampleName = %q, want %q (leading ' should be stripped)", got, "=2+2")
+	}
+}
+
 // FuzzParse exercises the parser with arbitrary input. The property
 // checked is that Parse never panics, regardless of input. A
 // successful parse must produce a sheet in a known format. Round-trip

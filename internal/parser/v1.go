@@ -100,7 +100,7 @@ func v1RowToSample(row []string, header []string, colIdx map[string]int, line in
 		if col >= len(row) {
 			continue // row is shorter than the header
 		}
-		value := strings.TrimSpace(row[col])
+		value := unescapeCSVSafe(strings.TrimSpace(row[col]))
 		if setter, ok := knownColumns[lcName]; ok {
 			setter(&s, value)
 			continue

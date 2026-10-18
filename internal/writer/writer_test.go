@@ -396,6 +396,47 @@ func TestWrite_CSVInjectionSafeValue(t *testing.T) {
 	}
 }
 
+func TestWrite_CSVInjectionRoundTrip(t *testing.T) {
+	// A dangerous value written by the writer (escaped to "'=…")
+	// must round-trip back to the original unescaped value after
+	// a re-parse. Without the parser's unescape the model would
+	// permanently carry the leading quote.
+	cases := []string{
+		"=2+2",
+		"+1+1",
+		"-2+2",
+		"@SUM(A1:A10)",
+	}
+	for _, dangerous := range cases {
+		t.Run(dangerous, func(t *testing.T) {
+			sheet := &model.SampleSheet{
+				Format: model.FormatV2,
+				Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+				Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+				Data: []model.Sample{
+					{SampleID: "id1", SampleName: dangerous, Index: "ATCGATCG", SampleProject: "P1"},
+				},
+			}
+			var buf bytes.Buffer
+			if err := WriteV2(&buf, sheet); err != nil {
+				t.Fatalf("WriteV2: %v", err)
+			}
+			// Confirm the writer did escape the value.
+			if !strings.Contains(buf.String(), "'"+dangerous) {
+				t.Fatalf("writer did not escape %q:\n%s", dangerous, buf.String())
+			}
+			// Re-parse and confirm the model has the unescaped value.
+			round, err := parser.Parse(&buf)
+			if err != nil {
+				t.Fatalf("Parse: %v\noutput:\n%s", err, buf.String())
+			}
+			if got := round.Data[0].SampleName; got != dangerous {
+				t.Errorf("round.Data[0].SampleName = %q, want %q (round-trip must be lossless)", got, dangerous)
+			}
+		})
+	}
+}
+
 func TestWriteV2_PreservesExtraColumns(t *testing.T) {
 	// Regression test for HI-01: a v2 sheet carrying a custom
 	// column must round-trip the column through the writer.

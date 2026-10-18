@@ -101,6 +101,23 @@ func stripBOM(b []byte) string {
 	return strings.TrimPrefix(s, bom)
 }
 
+// unescapeCSVSafe reverses the writer's csvSafe escape on read. The
+// writer prepends a single quote to any cell whose first byte is one
+// of the spreadsheet-formula triggers ('=', '+', '-', '@', '\t',
+// '\r'); this strips that prefix back off so a parse → write → parse
+// round-trip is lossless. Cells whose second character is not in the
+// trigger set are returned unchanged, so a legitimate leading quote
+// (e.g. "'twas the night") survives.
+func unescapeCSVSafe(s string) string {
+	if len(s) >= 2 && s[0] == '\'' {
+		switch s[1] {
+		case '=', '+', '-', '@', '\t', '\r':
+			return s[1:]
+		}
+	}
+	return s
+}
+
 // splitLines breaks s on \r\n, \n, or \r and returns each line without
 // the terminator.
 func splitLines(s string) []string {
@@ -178,7 +195,9 @@ func readCSV(raw []string, startLine int) ([]csvRecord, error) {
 	out := make([]csvRecord, 0, len(records))
 	for _, rec := range records {
 		cp := make(csvRecord, len(rec))
-		copy(cp, rec)
+		for i, cell := range rec {
+			cp[i] = unescapeCSVSafe(cell)
+		}
 		out = append(out, cp)
 	}
 	return out, nil
