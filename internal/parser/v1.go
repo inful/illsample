@@ -10,28 +10,6 @@ import (
 	"github.com/inful/illsample/internal/model"
 )
 
-// knownColumns maps a lowercased column name to the Sample field setter
-// that should be invoked when that column is present.
-var knownColumns = map[string]func(*model.Sample, string){
-	"sample_id":      func(s *model.Sample, v string) { s.SampleID = v },
-	"sampleid":       func(s *model.Sample, v string) { s.SampleID = v },
-	"samplename":     func(s *model.Sample, v string) { s.SampleName = v },
-	"sample_name":    func(s *model.Sample, v string) { s.SampleName = v },
-	"sample_plate":   func(s *model.Sample, v string) { s.SamplePlate = v },
-	"sampleplate":    func(s *model.Sample, v string) { s.SamplePlate = v },
-	"sample_well":    func(s *model.Sample, v string) { s.SampleWell = v },
-	"samplewell":     func(s *model.Sample, v string) { s.SampleWell = v },
-	"i7_index_id":    func(s *model.Sample, v string) { s.I7IndexID = v },
-	"i7indexid":      func(s *model.Sample, v string) { s.I7IndexID = v }, // legacy no-underscore alias
-	"index":          func(s *model.Sample, v string) { s.Index = v },
-	"i5_index_id":    func(s *model.Sample, v string) { s.I5IndexID = v },
-	"i5indexid":      func(s *model.Sample, v string) { s.I5IndexID = v },
-	"index2":         func(s *model.Sample, v string) { s.Index2 = v },
-	"sample_project": func(s *model.Sample, v string) { s.SampleProject = v },
-	"sampleproject":  func(s *model.Sample, v string) { s.SampleProject = v },
-	"description":    func(s *model.Sample, v string) { s.Description = v },
-}
-
 // parseV1 parses a v1 sample sheet. data may begin with a UTF-8 BOM.
 // Non-UTF-8 input is rejected with a ParseError so that callers using
 // ParseV1 directly get the same behaviour as callers using the
@@ -101,8 +79,8 @@ func v1RowToSample(row []string, header []string, colIdx map[string]int, line in
 			continue // row is shorter than the header
 		}
 		value := unescapeCSVSafe(strings.TrimSpace(row[col]))
-		if setter, ok := knownColumns[lcName]; ok {
-			setter(&s, value)
+		if c := model.ColumnByName(lcName); c != nil {
+			c.Set(&s, value)
 			continue
 		}
 		// Unknown column: preserve verbatim under its original name.

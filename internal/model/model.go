@@ -4,6 +4,8 @@
 // in use.
 package model
 
+import "strings"
+
 // Format identifies the on-disk layout of a sample sheet.
 type Format int
 
@@ -126,4 +128,71 @@ type Manifest struct {
 	D string
 	E string
 	F string
+}
+
+// Column describes a known column in the [Data] section. The first
+// entry of Names is the canonical form emitted by the v2 writer;
+// subsequent entries are aliases that parse to the same Sample
+// field. Set and Get read and write that field.
+//
+// The parser and the writer share this single registry; previously
+// each maintained its own parallel mapping, which let a renamed or
+// added column get out of sync across the two paths. Adding a
+// column is one entry here.
+type Column struct {
+	Names []string
+	Set   func(*Sample, string)
+	Get   func(*Sample) string
+}
+
+// CanonicalName returns the first entry of Names, which is the form
+// the v2 writer emits. Returns the input unchanged when the column
+// is unknown.
+func (c *Column) CanonicalName() string {
+	if c == nil || len(c.Names) == 0 {
+		return ""
+	}
+	return c.Names[0]
+}
+
+// columns is the typed column registry, in the order the v2 writer
+// emits them. The order is the IEM canonical v2 order; do not
+// reorder without a corresponding test update.
+var columns = []Column{
+	{Names: []string{"Sample_ID", "SampleID"}, Set: func(s *Sample, v string) { s.SampleID = v }, Get: func(s *Sample) string { return s.SampleID }},
+	{Names: []string{"Sample_Name", "SampleName"}, Set: func(s *Sample, v string) { s.SampleName = v }, Get: func(s *Sample) string { return s.SampleName }},
+	{Names: []string{"Sample_Plate", "SamplePlate"}, Set: func(s *Sample, v string) { s.SamplePlate = v }, Get: func(s *Sample) string { return s.SamplePlate }},
+	{Names: []string{"Sample_Well", "SampleWell"}, Set: func(s *Sample, v string) { s.SampleWell = v }, Get: func(s *Sample) string { return s.SampleWell }},
+	{Names: []string{"I7_Index_ID", "I7IndexID"}, Set: func(s *Sample, v string) { s.I7IndexID = v }, Get: func(s *Sample) string { return s.I7IndexID }},
+	{Names: []string{"index"}, Set: func(s *Sample, v string) { s.Index = v }, Get: func(s *Sample) string { return s.Index }},
+	{Names: []string{"I5_Index_ID", "I5IndexID"}, Set: func(s *Sample, v string) { s.I5IndexID = v }, Get: func(s *Sample) string { return s.I5IndexID }},
+	{Names: []string{"index2"}, Set: func(s *Sample, v string) { s.Index2 = v }, Get: func(s *Sample) string { return s.Index2 }},
+	{Names: []string{"Sample_Project", "SampleProject"}, Set: func(s *Sample, v string) { s.SampleProject = v }, Get: func(s *Sample) string { return s.SampleProject }},
+	{Names: []string{"Description"}, Set: func(s *Sample, v string) { s.Description = v }, Get: func(s *Sample) string { return s.Description }},
+}
+
+// ColumnByName returns the column whose name list contains the
+// given header (case-insensitive), or nil. The first match wins;
+// register each column with its canonical name first to make the
+// lookup deterministic.
+func ColumnByName(name string) *Column {
+	lower := strings.ToLower(name)
+	for i := range columns {
+		for _, n := range columns[i].Names {
+			if strings.ToLower(n) == lower {
+				return &columns[i]
+			}
+		}
+	}
+	return nil
+}
+
+// CanonicalColumnNames returns the canonical column names in the
+// order the v2 writer emits them.
+func CanonicalColumnNames() []string {
+	out := make([]string, len(columns))
+	for i, c := range columns {
+		out[i] = c.Names[0]
+	}
+	return out
 }

@@ -26,32 +26,12 @@ import (
 )
 
 // canonicalColumnsV2 is the column order used by the IEM v2 [Data] section.
-var canonicalColumnsV2 = []string{
-	"Sample_ID",
-	"Sample_Name",
-	"Sample_Plate",
-	"Sample_Well",
-	"I7_Index_ID",
-	"index",
-	"I5_Index_ID",
-	"index2",
-	"Sample_Project",
-	"Description",
-}
+// It is derived from the model registry so the v1 default header and the
+// v2 canonical header cannot drift apart. See also defaultHeaderV1.
+var canonicalColumnsV2 = model.CanonicalColumnNames()
 
 // defaultHeaderV1 is used when a v1 sheet has no recorded header.
-var defaultHeaderV1 = []string{
-	"Sample_ID",
-	"Sample_Name",
-	"Sample_Plate",
-	"Sample_Well",
-	"I7_Index_ID",
-	"index",
-	"I5_Index_ID",
-	"index2",
-	"Sample_Project",
-	"Description",
-}
+var defaultHeaderV1 = model.CanonicalColumnNames()
 
 // Write serialises sheet to w. The output format is chosen from
 // sheet.Format. FormatUnknown is treated as v2.
@@ -394,31 +374,12 @@ func appendExtraColumns(header []string, data []model.Sample) []string {
 	return append(header, extras...)
 }
 
-// fieldFor returns the value of sample for the given column name. It
-// handles the known columns and falls back to Extra. The lookup is
-// case-insensitive.
+// fieldFor returns the value of sample for the given column name. The
+// lookup is case-insensitive via the model column registry; unknown
+// columns fall back to Extra.
 func fieldFor(sample model.Sample, col string) string {
-	switch strings.ToLower(col) {
-	case "sample_id", "sampleid":
-		return sample.SampleID
-	case "sample_name", "samplename":
-		return sample.SampleName
-	case "sample_plate", "sampleplate":
-		return sample.SamplePlate
-	case "sample_well", "samplewell":
-		return sample.SampleWell
-	case "i7_index_id", "i7indexid":
-		return sample.I7IndexID
-	case "index":
-		return sample.Index
-	case "i5_index_id", "i5indexid":
-		return sample.I5IndexID
-	case "index2":
-		return sample.Index2
-	case "sample_project", "sampleproject":
-		return sample.SampleProject
-	case "description":
-		return sample.Description
+	if c := model.ColumnByName(col); c != nil {
+		return c.Get(&sample)
 	}
 	if v, ok := sample.Extra[col]; ok {
 		return v
@@ -446,22 +407,14 @@ func csvSafe(s string) string {
 	}
 	return s
 }
+
+// canonicalAlias returns the canonical column name for the given
+// header, or the input itself if no alias is known. The v2 writer
+// uses this to deduplicate aliased columns (e.g. "I7IndexID" and
+// "I7_Index_ID" should not both be emitted).
 func canonicalAlias(name string) string {
-	switch strings.ToLower(name) {
-	case "sampleid":
-		return "Sample_ID"
-	case "samplename":
-		return "Sample_Name"
-	case "sampleplate":
-		return "Sample_Plate"
-	case "samplewell":
-		return "Sample_Well"
-	case "i7indexid":
-		return "I7_Index_ID"
-	case "i5indexid":
-		return "I5_Index_ID"
-	case "sampleproject":
-		return "Sample_Project"
+	if c := model.ColumnByName(name); c != nil {
+		return c.CanonicalName()
 	}
 	return name
 }
