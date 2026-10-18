@@ -28,12 +28,35 @@ import (
 	"github.com/inful/illsample/internal/model"
 )
 
+// maxInputSize caps the number of bytes the parser will read from an
+// io.Reader. A real Illumina sample sheet is well under 500 KB
+// (1000 samples × ~500 bytes per row); 2 MB is a 4-5x headroom
+// limit that prevents a piped multi-GB file from OOMing the
+// process. Library users can override this var for tighter or
+// looser limits. Tests override it to exercise the boundary with
+// small inputs.
+var maxInputSize = 2 * 1024 * 1024
+
+// readLimited reads up to maxInputSize+1 bytes from r. If the input
+// is larger than maxInputSize, it returns a *ParseError rather than
+// allocating a buffer for it.
+func readLimited(r io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, int64(maxInputSize)+1))
+	if err != nil {
+		return nil, fmt.Errorf("read sample sheet: %w", err)
+	}
+	if len(data) > maxInputSize {
+		return nil, &ParseError{Msg: fmt.Sprintf("input too large (max %d bytes)", maxInputSize)}
+	}
+	return data, nil
+}
+
 // Parse reads a sample sheet from r and returns the parsed model. The
 // on-disk layout is auto-detected.
 func Parse(r io.Reader) (*model.SampleSheet, error) {
-	data, err := io.ReadAll(r)
+	data, err := readLimited(r)
 	if err != nil {
-		return nil, fmt.Errorf("read sample sheet: %w", err)
+		return nil, err
 	}
 	return ParseBytes(data)
 }
@@ -57,18 +80,18 @@ func ParseBytes(data []byte) (*model.SampleSheet, error) {
 
 // ParseV1 parses a v1 (legacy single-section CSV) sample sheet.
 func ParseV1(r io.Reader) (*model.SampleSheet, error) {
-	data, err := io.ReadAll(r)
+	data, err := readLimited(r)
 	if err != nil {
-		return nil, fmt.Errorf("read sample sheet: %w", err)
+		return nil, err
 	}
 	return parseV1(data)
 }
 
 // ParseV2 parses a v2 (IEM sectioned) sample sheet.
 func ParseV2(r io.Reader) (*model.SampleSheet, error) {
-	data, err := io.ReadAll(r)
+	data, err := readLimited(r)
 	if err != nil {
-		return nil, fmt.Errorf("read sample sheet: %w", err)
+		return nil, err
 	}
 	text := stripBOM(data)
 	lines := splitLines(text)

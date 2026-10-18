@@ -653,6 +653,47 @@ func TestParseV2_StripsCSVInjectionEscape(t *testing.T) {
 	}
 }
 
+func TestParse_InputTooLarge(t *testing.T) {
+	// Shrink the cap so the test does not need to allocate 2 MB.
+	orig := maxInputSize
+	maxInputSize = 16
+	defer func() { maxInputSize = orig }()
+
+	// 17-byte input: one byte over the cap.
+	input := "Sample_ID,Name\nid1,longname2"
+	if len(input) <= maxInputSize {
+		t.Fatalf("test setup: input is %d bytes, must exceed cap %d", len(input), maxInputSize)
+	}
+	_, err := Parse(strings.NewReader(input))
+	if err == nil {
+		t.Fatal("Parse: expected error for too-large input, got nil")
+	}
+	var pe *ParseError
+	if !errors.As(err, &pe) {
+		t.Fatalf("error type = %T, want *ParseError", err)
+	}
+	if !strings.Contains(pe.Msg, "too large") {
+		t.Errorf("error Msg = %q, want substring \"too large\"", pe.Msg)
+	}
+}
+
+func TestParse_InputAtCap(t *testing.T) {
+	// Input exactly at the cap is accepted (the limit is
+	// "more than maxInputSize").
+	orig := maxInputSize
+	maxInputSize = 16
+	defer func() { maxInputSize = orig }()
+
+	// 16-byte input: exactly at the cap. Pad "x" to reach the size.
+	input := "Sample_ID,Name\n" + strings.Repeat("x", 16-len("Sample_ID,Name\n"))
+	if len(input) != maxInputSize {
+		t.Fatalf("test setup: input is %d bytes, must equal cap %d", len(input), maxInputSize)
+	}
+	if _, err := Parse(strings.NewReader(input)); err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+}
+
 // FuzzParse exercises the parser with arbitrary input. The property
 // checked is that Parse never panics, regardless of input. A
 // successful parse must produce a sheet in a known format. Round-trip
