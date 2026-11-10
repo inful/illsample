@@ -29,7 +29,8 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 	}
 	p := &lineParser{lines: lines}
 
-	// Skip any preamble (comments, blank lines) before the first section.
+	// Skip any preamble (comments, blank lines, free text) before the
+	// first section.
 	for !p.eof() {
 		t := strings.TrimSpace(p.lines[p.pos])
 		if t == "" || comment(t) {
@@ -39,7 +40,10 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 		if isSectionHeader(t) {
 			break
 		}
-		return nil, p.errAt("expected [Section] header, got %q", t)
+		if !preambleLine(t) {
+			return nil, p.errAt("expected [Section] header, got %q", t)
+		}
+		p.pos++
 	}
 
 	for !p.eof() {
@@ -56,7 +60,9 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 		p.pos++ // consume the section header
 
 		switch name {
-		case "data":
+		case "data", "bclconvert_data":
+			// Illumina's BCL Convert dialect names the data section
+			// [BCLConvert_Data]; IEM names it [Data].
 			if err := parseDataSection(p, sheet); err != nil {
 				return nil, err
 			}
@@ -64,8 +70,12 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 			if err := parseReadsSection(p, sheet); err != nil {
 				return nil, err
 			}
-		case "settings":
-			if err := parseSettingsSection(p, sheet); err != nil {
+		case "settings", "bclconvert_settings":
+			// The two dialects spell the settings section
+			// differently and lay it out differently: [Settings]
+			// is a header row plus a value row, while
+			// [BCLConvert_Settings] is one "Key,Value" pair per row.
+			if err := parseSettingsSection(p, sheet, name == "bclconvert_settings"); err != nil {
 				return nil, err
 			}
 		case "manifests":
@@ -120,8 +130,11 @@ func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
 	return nil
 }
 
-// parseReadsSection reads a [Reads] section, which is a vertical
-// key/value list: keys on one line, values on the next, repeating.
+// parseReadsSection reads a [Reads] section. Two layouts exist: IEM
+// puts the key on one line and the value on the next, while Illumina's
+// BCL Convert dialect writes "Key,Value" on a single line. A line
+// that contains a comma is the latter; otherwise the value is on the
+// next line.
 func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 	if sheet.Reads == nil {
 		sheet.Reads = &model.Reads{}
@@ -141,13 +154,20 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 			continue
 		}
 		p.next()
+		value := ""
 		if key == "" {
-			key = trimmed
-			continue
+			if k, v, found := strings.Cut(trimmed, ","); found {
+				key, value = strings.TrimSpace(k), strings.TrimSpace(v)
+			} else {
+				key = trimmed
+				continue
+			}
+		} else {
+			value = trimmed
 		}
-		n, err := strconv.Atoi(trimmed)
+		n, err := strconv.Atoi(value)
 		if err != nil {
-			return p.errAt("[Reads] value for %q must be an integer, got %q", key, trimmed)
+			return p.errAt("[Reads] value for %q must be an integer, got %q", key, value)
 		}
 		switch key {
 		case "Read1Cycles":
@@ -169,13 +189,17 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 	return nil
 }
 
-// parseSettingsSection reads a [Settings] section, which is a 2-column
-// CSV: the first row is the header, subsequent rows are values. When
-// the section contains more than one data row, later rows override
-// earlier ones (last-non-empty wins). This is the behaviour bcl2fastq
-// effectively implements and is what users editing a sheet by hand
-// usually expect.
-func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
+// parseSettingsSection reads a settings section.
+//
+// Two layouts exist. IEM's [Settings] is a 2-column CSV: the first
+// row is the header, subsequent rows are values. Illumina's BCL
+// Convert dialect ([BCLConvert_Settings]) writes one "Key,Value" pair
+// per row instead; pairForm selects that layout.
+//
+// In the header/value layout, later rows override earlier ones
+// (last-non-empty wins). This is the behaviour bcl2fastq effectively
+// implements and is what users editing a sheet by hand usually expect.
+func parseSettingsSection(p *lineParser, sheet *model.SampleSheet, pairForm bool) error {
 	raw, startLine, err := collectSection(p)
 	if err != nil {
 		return err
@@ -192,6 +216,23 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 	}
 	if sheet.Settings == nil {
 		sheet.Settings = &model.Settings{}
+	}
+	if pairForm {
+		for _, rec := range records {
+			if len(rec) == 0 {
+				continue
+			}
+			key := strings.TrimSpace(rec[0])
+			if key == "" {
+				continue
+			}
+			value := ""
+			if len(rec) > 1 {
+				value = strings.TrimSpace(rec[1])
+			}
+			applySetting(sheet.Settings, key, value)
+		}
+		return nil
 	}
 	header := records[0]
 	for col, name := range header {
@@ -214,23 +255,31 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet) error {
 				value = v
 			}
 		}
-		// Key lookup is case-insensitive. The IEM spec uses
-		// canonical case (Adapter, AdapterRead2) but real-world
-		// sheets sometimes use lowercase, and the v1 path is
-		// already case-insensitive — we want a consistent story.
-		switch strings.ToLower(key) {
-		case "adapter":
-			sheet.Settings.Adapter = value
-		case "adapterread2":
-			sheet.Settings.AdapterRead2 = value
-		default:
-			if sheet.Settings.Extra == nil {
-				sheet.Settings.Extra = make(map[string]string)
-			}
-			sheet.Settings.Extra[key] = value
-		}
+		applySetting(sheet.Settings, key, value)
 	}
 	return nil
+}
+
+// applySetting stores one settings key/value pair. The key lookup is
+// case-insensitive. The IEM spec uses canonical case (Adapter,
+// AdapterRead2) but real-world sheets sometimes use lowercase, and the
+// v1 path is already case-insensitive — we want a consistent story.
+//
+// "AdapterRead1" (Illumina's name for the Read 1 adapter) is kept in
+// Extra rather than mapped onto Adapter, so that a round-trip writes
+// the key back under the name the source used.
+func applySetting(s *model.Settings, key, value string) {
+	switch strings.ToLower(key) {
+	case "adapter":
+		s.Adapter = value
+	case "adapterread2":
+		s.AdapterRead2 = value
+	default:
+		if s.Extra == nil {
+			s.Extra = make(map[string]string)
+		}
+		s.Extra[key] = value
+	}
 }
 
 // parseManifestsSection reads a [Manifests] section. IEM allows a single

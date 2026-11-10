@@ -6,13 +6,17 @@
 //     not matter; columns are matched by name.
 //
 //   - v2 (IEM): a sequence of sections, each introduced by a [Name]
-//     header. [Data] is a CSV section, [Reads] is a vertical key/value
-//     section, and [Settings] is a 2-column CSV section. Unknown
-//     sections are preserved verbatim in SampleSheet.Extra so that
-//     round-trip writing is lossless.
+//     header. [Data] is a CSV section, [Reads] is a key/value
+//     section, and [Settings] is a 2-column CSV section. Illumina's
+//     own dialect spells the last two [BCLConvert_Settings] and
+//     [BCLConvert_Data] and writes [Reads] as "Key,Value" pairs on one
+//     line; both spellings are read. Unknown sections are preserved
+//     verbatim in SampleSheet.Extra so that round-trip writing is
+//     lossless.
 //
-// The top-level Parse function auto-detects the layout by inspecting
-// the first non-empty line. Callers that need a specific variant should
+// The top-level Parse function auto-detects the layout: a sheet is v2
+// when its first [Section] header is reached before any line that
+// looks like a CSV row. Callers that need a specific variant should
 // use ParseV1 or ParseV2.
 package parser
 
@@ -169,18 +173,52 @@ func stripBlankLines(lines []string) []string {
 	return lines[start:end]
 }
 
-// isV2 reports whether the first non-empty, non-comment line of lines
-// is a [Section] header. v2 sheets always start with a section header
-// (almost always [Data]); v1 sheets start with the column header row.
+// isV2 reports whether lines describe a v2 (sectioned) sheet.
+//
+// A v2 sheet is a sequence of [Section] blocks, so the first section
+// header identifies it. That header is normally the first non-blank
+// line, but real files sometimes carry a short text preamble (the
+// Illumina v2 template does), so preamble lines are skipped. A line
+// that looks like a CSV row ends the scan: a v1 sheet's header row is
+// such a line, and swallowing it as a preamble would drop the sheet's
+// data.
 func isV2(lines []string) bool {
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
 		if t == "" || comment(t) {
 			continue
 		}
-		return isSectionHeader(t)
+		if isSectionHeader(t) {
+			return true
+		}
+		if !preambleLine(t) {
+			return false
+		}
 	}
 	return false
+}
+
+// preambleLine reports whether a line can be skipped as part of a
+// text preamble that precedes the first [Section] header.
+//
+// Preamble lines are free text — a note about the run, an instruction
+// left over from the Illumina template — so they contain spaces. A CSV
+// row is a sequence of short identifier-like fields ("Sample_ID,index")
+// instead. A line with two or more such fields is a row, not a note.
+func preambleLine(s string) bool {
+	fields := 0
+	for _, f := range strings.Split(s, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		fields++
+		if strings.ContainsAny(f, " \t") {
+			// Free text: a note, not a CSV row.
+			return true
+		}
+	}
+	return fields < 2
 }
 
 // isSectionHeader reports whether s looks like a [Name] section header.

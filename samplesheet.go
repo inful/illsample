@@ -7,8 +7,10 @@
 //     does not matter; columns are matched by name.
 //
 //   - v2 (IEM): a sequence of sections, each introduced by a [Name]
-//     header. [Data] is a CSV section, [Reads] is a vertical
-//     key/value section, and [Settings] is a 2-column CSV section.
+//     header. [Data] is a CSV section, [Reads] is a key/value
+//     section, and [Settings] is a 2-column CSV section. Illumina's
+//     own dialect ([BCLConvert_Data], [BCLConvert_Settings]) is read
+//     as well.
 //
 // The high-level Parse function auto-detects the layout; use
 // ParseV1 or ParseV2 when the format is known. Write picks the
@@ -86,8 +88,9 @@ const (
 )
 
 // Parse reads a sample sheet from r and returns the parsed model.
-// The on-disk layout is auto-detected from the first non-empty
-// line. Use ParseV1 or ParseV2 to force a specific format.
+// The on-disk layout is auto-detected: a sheet is v2 when its first
+// [Section] header is reached before any line that looks like a CSV
+// row. Use ParseV1 or ParseV2 to force a specific format.
 func Parse(r io.Reader) (*SampleSheet, error) {
 	return parser.Parse(r)
 }

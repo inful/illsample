@@ -472,6 +472,96 @@ func TestParseV2_SlashCommentInPreamble(t *testing.T) {
 	}
 }
 
+func TestParseV2_IlluminaBCLConvertDialect(t *testing.T) {
+	// Illumina's v2 dialect (the official SampleSheet_v2_template)
+	// names the sections [BCLConvert_Data]/[BCLConvert_Settings] and
+	// writes [Reads] as "Key,Value" pairs on one line.
+	input := "[Header]\n" +
+		"FileFormatVersion,2\n" +
+		"RunName,MyRun\n" +
+		"[Reads]\n" +
+		"Read1Cycles,151\n" +
+		"Index1Cycles,8\n" +
+		"[BCLConvert_Settings]\n" +
+		"AdapterRead1,AGATCG\n" +
+		"SoftwareVersion,4.1.27\n" +
+		"[BCLConvert_Data]\n" +
+		"Sample_ID,index,index2\n" +
+		"id1,ATCG,TTAA\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Format != model.FormatV2 {
+		t.Errorf("Format = %v, want v2", sheet.Format)
+	}
+	if len(sheet.Data) != 1 {
+		t.Fatalf("len(Data) = %d, want 1", len(sheet.Data))
+	}
+	if sheet.Data[0].SampleID != "id1" || sheet.Data[0].Index != "ATCG" || sheet.Data[0].Index2 != "TTAA" {
+		t.Errorf("Data[0] = %+v, want id1/ATCG/TTAA", sheet.Data[0])
+	}
+	if sheet.Reads == nil {
+		t.Fatal("Reads is nil")
+	}
+	if sheet.Reads.Read1Cycles != 151 || sheet.Reads.Index1Cycles != 8 {
+		t.Errorf("Reads = %+v, want Read1Cycles=151 Index1Cycles=8", sheet.Reads)
+	}
+	if sheet.Settings == nil {
+		t.Fatal("Settings is nil")
+	}
+	if got := sheet.Settings.Extra["AdapterRead1"]; got != "AGATCG" {
+		t.Errorf("Extra[AdapterRead1] = %q, want AGATCG", got)
+	}
+	if got := sheet.Settings.Extra["SoftwareVersion"]; got != "4.1.27" {
+		t.Errorf("Extra[SoftwareVersion] = %q, want 4.1.27", got)
+	}
+	// The unknown [Header] section is preserved verbatim.
+	if _, ok := sheet.Extra["Header"]; !ok {
+		t.Error("Extra[Header] missing")
+	}
+}
+
+func TestParseV2_TextPreamble(t *testing.T) {
+	// A v2 sheet may carry a short text preamble (the Illumina
+	// template does); it must not stop the v2 detection.
+	input := "Illumina SampleSheet, exported 2026-11-10\n" +
+		"[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,ATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Format != model.FormatV2 {
+		t.Errorf("Format = %v, want v2", sheet.Format)
+	}
+	if len(sheet.Data) != 1 {
+		t.Errorf("len(Data) = %d, want 1", len(sheet.Data))
+	}
+	if sheet.Data[0].SampleID != "id1" {
+		t.Errorf("SampleID = %q, want id1", sheet.Data[0].SampleID)
+	}
+}
+
+func TestParseV1_NotDetectedAsV2(t *testing.T) {
+	// A v1 header row is not a preamble: it must stop the scan so
+	// the sheet stays v1 and keeps its rows.
+	input := "Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,ATCG,P1\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Format != model.FormatV1 {
+		t.Errorf("Format = %v, want v1", sheet.Format)
+	}
+	if len(sheet.Data) != 1 {
+		t.Errorf("len(Data) = %d, want 1", len(sheet.Data))
+	}
+}
+
 func TestParseV2_SettingsCaseInsensitive(t *testing.T) {
 	// Regression test for WR-04: a [Settings] section with
 	// lowercase keys must still populate the typed fields.
