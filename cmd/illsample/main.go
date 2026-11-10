@@ -92,6 +92,7 @@ func runValidate(args []string) int {
 	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
 	strict := fs.Bool("strict", false, "treat warnings as errors")
 	noWarn := fs.Bool("no-warn", false, "suppress warnings from the output")
+	format := fs.String("f", "", "input format: v1 or v2 (default: auto-detect)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -99,7 +100,13 @@ func runValidate(args []string) int {
 		fmt.Fprintln(os.Stderr, "validate: expected exactly one file argument")
 		return 2
 	}
-	sheet, err := loadSheet(fs.Arg(0))
+	switch strings.ToLower(*format) {
+	case "", "v1", "v2":
+	default:
+		fmt.Fprintf(os.Stderr, "validate: invalid format %q (want v1 or v2)\n", *format)
+		return 2
+	}
+	sheet, err := loadSheet(fs.Arg(0), *format)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "validate: %v\n", err)
 		return 1
@@ -128,7 +135,7 @@ func runConvert(args []string) int {
 		fmt.Fprintln(os.Stderr, "convert: expected exactly one file argument")
 		return 2
 	}
-	sheet, err := loadSheet(fs.Arg(0))
+	sheet, err := loadSheet(fs.Arg(0), "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "convert: %v\n", err)
 		return 1
@@ -182,7 +189,7 @@ func runInfo(args []string) int {
 		fmt.Fprintln(os.Stderr, "info: expected exactly one file argument")
 		return 2
 	}
-	sheet, err := loadSheet(fs.Arg(0))
+	sheet, err := loadSheet(fs.Arg(0), "")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "info: %v\n", err)
 		return 1
@@ -236,12 +243,21 @@ func extraNames(extra map[string]illsample.Section) []string {
 	return names
 }
 
-// loadSheet parses a file from disk. The returned error is wrapped
-// with the file's basename (or "<stdin>" for the `-` path) so the
-// user can tell which file failed when they're looping over many.
-func loadSheet(path string) (*illsample.SampleSheet, error) {
+// loadSheet parses a file from disk. The format argument forces a
+// specific layout ("v1" or "v2"); an empty argument auto-detects it.
+// The returned error is wrapped with the file's basename (or "<stdin>"
+// for the `-` path) so the user can tell which file failed when
+// they're looping over many.
+func loadSheet(path, format string) (*illsample.SampleSheet, error) {
+	parse := illsample.Parse
+	switch strings.ToLower(format) {
+	case "v1":
+		parse = illsample.ParseV1
+	case "v2":
+		parse = illsample.ParseV2
+	}
 	if path == "-" {
-		sheet, err := illsample.Parse(os.Stdin)
+		sheet, err := parse(os.Stdin)
 		if err != nil {
 			return nil, fmt.Errorf("<stdin>: %w", err)
 		}
@@ -252,7 +268,7 @@ func loadSheet(path string) (*illsample.SampleSheet, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
-	sheet, err := illsample.Parse(f)
+	sheet, err := parse(f)
 	if err != nil {
 		var pe *illsample.ParseError
 		if errors.As(err, &pe) {
@@ -266,6 +282,10 @@ func loadSheet(path string) (*illsample.SampleSheet, error) {
 // printResult formats a verification result for the terminal. Errors
 // and warnings are written to errOut (typically stderr) so a
 // downstream pipe only sees the summary on stdout.
+//
+// Each issue is printed once. Under -strict the warnings are also
+// counted as errors, so they are not repeated in the error list; the
+// summary line says so.
 func printResult(out io.Writer, errOut io.Writer, result *illsample.VerificationResult, strict, noWarn bool) {
 	if result == nil || result.OK() {
 		_, _ = fmt.Fprintln(out, "OK: no issues found")
@@ -277,10 +297,16 @@ func printResult(out io.Writer, errOut io.Writer, result *illsample.Verification
 		}
 	}
 	for _, iss := range result.Errors() {
+		if iss.Severity == illsample.SeverityWarning {
+			// Already printed above; -strict only changes the count.
+			continue
+		}
 		_, _ = fmt.Fprintf(errOut, "error %s: %s [%s]\n", iss.Code, iss.Message, iss.Location)
 	}
 	counts := struct{ errors, warnings int }{}
 	counts.errors = len(result.Errors())
-	counts.warnings = len(result.Warnings())
+	if !strict {
+		counts.warnings = len(result.Warnings())
+	}
 	_, _ = fmt.Fprintf(out, "summary: %d error(s), %d warning(s) (strict=%v)\n", counts.errors, counts.warnings, strict)
 }

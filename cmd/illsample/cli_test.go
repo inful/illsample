@@ -101,6 +101,38 @@ func TestCLI_Validate_Failure(t *testing.T) {
 	}
 }
 
+func TestCLI_Validate_IlluminaV2(t *testing.T) {
+	// An Illumina v2 sheet ([BCLConvert_Data], [BCLConvert_Settings],
+	// "Key,Value" [Reads]) must validate, not fail to parse.
+	repoRoot := findRepoRoot(t)
+	stdout, stderr, exit := run(t, "validate", filepath.Join(repoRoot, "testdata", "v2_illumina_bclconvert.csv"))
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0 (stderr: %s)", exit, stderr)
+	}
+	if !strings.Contains(stdout, "summary") && !strings.Contains(stdout, "OK") {
+		t.Errorf("stdout = %q, want a summary or OK", stdout)
+	}
+}
+
+func TestCLI_Validate_ForceFormat(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	v2 := filepath.Join(repoRoot, "testdata", "v2_illumina_bclconvert.csv")
+	// Forcing the format must not change the outcome of a file that
+	// auto-detects correctly.
+	_, _, exit := run(t, "validate", "-f", "v2", v2)
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	// A bad format is a usage error.
+	_, stderr, exit := run(t, "validate", "-f", "v9", v2)
+	if exit != 2 {
+		t.Errorf("exit = %d, want 2", exit)
+	}
+	if !strings.Contains(stderr, "invalid format") {
+		t.Errorf("stderr = %q, want to contain 'invalid format'", stderr)
+	}
+}
+
 func TestCLI_Validate_NoArgs(t *testing.T) {
 	_, _, exit := run(t, "validate")
 	if exit != 2 {

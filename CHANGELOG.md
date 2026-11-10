@@ -6,6 +6,27 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `illsample validate -f v1|v2` forces the input format instead of
+  auto-detecting it.
+
+### Fixed
+- v2 detection no longer requires the first non-empty line to be a
+  `[Section]` header. A text preamble (as in Illumina's v2 template)
+  no longer makes a v2 sheet look like a v1 CSV.
+- Illumina's own v2 dialect is now read: the `[BCLConvert_Data]` and
+  `[BCLConvert_Settings]` section names, and a `[Reads]` section
+  written as `Key,Value` pairs on one line. Such sheets previously
+  failed to parse.
+- `Sample_Name` and `Sample_Project` are optional in v2 — Illumina's
+  spec requires only `Sample_ID` and `index` — so they are reported
+  as warnings instead of errors.
+- `W_V2_NO_ADAPTER` no longer fires when the settings section spells
+  the Read 1 adapter `AdapterRead1`.
+- `E_V2_INDEX_VS_READS` names the `[Reads]` key it compares against.
+- `illsample validate -strict` no longer prints a promoted warning
+  twice, and counts it once.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

@@ -113,6 +113,9 @@ illsample validate SampleSheet.csv
 # Strict mode: treat warnings as errors.
 illsample validate -strict SampleSheet.csv
 
+# Force the input format instead of auto-detecting it.
+illsample validate -f v2 SampleSheet.csv
+
 # Print a summary of the sheet.
 illsample info SampleSheet.csv
 
@@ -174,16 +177,37 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 - Any other section is preserved verbatim in `SampleSheet.Extra` so that
   round-trips are lossless.
 
+Illumina's own v2 dialect (the `SampleSheet_v2_template.csv` that BaseSpace
+and BCL Convert use) spells the same sections differently and is read too:
+
+```ini
+[Reads]
+Read1Cycles,151
+Index1Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[BCLConvert_Data]
+Sample_ID,index,index2
+sample_01,ATCGATCG,TTAA
+```
+
+- `[BCLConvert_Data]` is the data section, `[BCLConvert_Settings]` the
+  settings section, and `[Reads]` writes `Key,Value` on one line.
+- The writer always emits the IEM layout shown above, whatever the
+  source looked like.
+
 ## Verification rules
 
 | Code | Severity | What it catches |
 |------|----------|-----------------|
 | `E_NIL_SHEET`               | error   | `Verify` was called with a nil sheet |
-| `E_V1_NO_DATA`              | error   | v1 sheet has no data rows |
-| `E_V1_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
-| `E_V1_MISSING_SAMPLE_NAME`  | error   | `Sample_Name` column missing |
-| `E_V1_MISSING_INDEX`        | error   | neither `index` nor `index2` present |
-| `E_V1_MISSING_SAMPLE_PROJECT` | error | `Sample_Project` column missing |
+- `E_V1_NO_DATA`              | error   | v1 sheet has no data rows |
+- `E_V1_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
+- `E_V1_MISSING_SAMPLE_NAME`  | error   | `Sample_Name` column missing |
+- `E_V1_MISSING_INDEX`        | error   | neither `index` nor `index2` present |
+- `E_V1_MISSING_SAMPLE_PROJECT` | error | `Sample_Project` column missing |
 | `E_V1_EMPTY_SAMPLE_ID`      | error   | a row has an empty `Sample_ID` |
 | `E_V1_DUPLICATE_SAMPLE_ID`  | error   | the same `Sample_ID` appears twice |
 | `E_V1_INVALID_INDEX`        | error   | index contains characters outside A/C/G/T/N |
@@ -192,8 +216,6 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 | `E_V2_NO_DATA`              | error   | `[Data]` section has no rows |
 | `E_V2_NO_READS`             | error   | `[Reads]` section is missing |
 | `E_V2_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
-| `E_V2_MISSING_SAMPLE_NAME`  | error   | `Sample_Name` column missing |
-| `E_V2_MISSING_SAMPLE_PROJECT` | error | `Sample_Project` column missing |
 | `E_V2_MISSING_INDEX`        | error   | `index` column missing |
 | `E_V2_READ1_MISSING`        | error   | `[Reads]` Read1Cycles not specified |
 | `E_V2_EMPTY_SAMPLE_ID`      | error   | a row has an empty `Sample_ID` |
@@ -204,10 +226,16 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 | `E_V2_INVALID_SAMPLE_NAME`  | error   | `Sample_Name` contains illegal characters |
 | `W_V1_INCONSISTENT_PLATE_WELL` | warning | some rows have plate/well, others don't |
 | `W_V1_LONG_SAMPLE_NAME`     | warning | `Sample_Name` is over 100 characters |
-| `W_V2_NO_ADAPTER`           | warning | no `Adapter` sequence in `[Settings]` |
+| `W_V2_MISSING_SAMPLE_NAME`  | warning | `Sample_Name` column missing (optional in the v2 spec) |
+| `W_V2_MISSING_SAMPLE_PROJECT` | warning | `Sample_Project` column missing (optional in the v2 spec) |
+| `W_V2_NO_ADAPTER`           | warning | no `Adapter`/`AdapterRead1` sequence in the settings |
 | `W_V2_INCONSISTENT_PLATE_WELL` | warning | some rows have plate/well, others don't |
 | `W_V2_INCONSISTENT_INDEX_IDS` | warning | `I7_Index_ID` / `I5_Index_ID` only on some rows |
 | `W_V2_LONG_SAMPLE_NAME`     | warning | `Sample_Name` is over 100 characters |
+
+`Sample_Name` and `Sample_Project` are required in v1 but optional in v2:
+Illumina's v2 spec lists only `Sample_ID` and `index` as required data
+columns. Use `-strict` to treat the v2 warnings as errors.
 
 The exact list of rules is defined in
 [`internal/verify/rules.go`](internal/verify/rules.go). Adding a rule is
@@ -238,6 +266,8 @@ send it, not just what the spec says:
 - **CRLF or LF** line endings both work.
 - **Section names** are case-insensitive (`[Data]`, `[data]`, `[DATA]` are
   equivalent).
+- **A text preamble** before the first `[Section]` header is skipped, so a
+  sheet that starts with a note is still recognised as v2.
 - **Column names** are case-insensitive.
 - **Comment lines** starting with `#` (or `//`) are ignored everywhere
   in v2 sheets.
