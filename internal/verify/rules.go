@@ -73,8 +73,10 @@ var allRules = []rule{
 	requireData,
 	requireReadsSection, // v2 only
 	requireSampleIDColumn,
-	requireSampleNameColumn,
-	requireSampleProjectColumn,
+	requireSampleNameColumnV1,
+	requireSampleNameColumnV2,
+	requireSampleProjectColumnV1,
+	requireSampleProjectColumnV2,
 	requireIndexColumn,
 	requireRead1Cycles, // v2 only
 
@@ -137,42 +139,61 @@ var requireSampleIDColumn = rule{
 	},
 }
 
-var requireSampleNameColumn = rule{
+// requireSampleNameColumnV1: bcl2fastq v1 requires Sample_Name.
+var requireSampleNameColumnV1 = rule{
 	suffix:   "MISSING_SAMPLE_NAME",
 	severity: SeverityError,
-	formats:  []model.Format{model.FormatV1, model.FormatV2},
+	formats:  []model.Format{model.FormatV1},
 	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Name") {
-			switch format {
-			case model.FormatV1:
-				r.add(SeverityError, code,
-					`required column "Sample_Name" is missing from the header`,
-					Location{Section: "Data", Row: -1})
-			case model.FormatV2:
-				r.add(SeverityError, code,
-					`required column "Sample_Name" is missing from the [Data] section`,
-					Location{Section: "Data", Row: -1, Column: "Sample_Name"})
-			}
+			r.add(SeverityError, code,
+				`required column "Sample_Name" is missing from the header`,
+				Location{Section: "Data", Row: -1})
 		}
 	},
 }
 
-var requireSampleProjectColumn = rule{
+// requireSampleNameColumnV2: Illumina's v2 spec lists Sample_ID and
+// index as the only required data columns, so a missing Sample_Name
+// is a warning rather than an error: the sheet still runs, but the
+// sample names may be wanted downstream.
+var requireSampleNameColumnV2 = rule{
+	suffix:   "MISSING_SAMPLE_NAME",
+	severity: SeverityWarning,
+	formats:  []model.Format{model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+		if !sheetsColumnHeaderContains(s, "Sample_Name") {
+			r.add(SeverityWarning, code,
+				`column "Sample_Name" is missing from the [Data] section`,
+				Location{Section: "Data", Row: -1, Column: "Sample_Name"})
+		}
+	},
+}
+
+var requireSampleProjectColumnV1 = rule{
 	suffix:   "MISSING_SAMPLE_PROJECT",
 	severity: SeverityError,
-	formats:  []model.Format{model.FormatV1, model.FormatV2},
+	formats:  []model.Format{model.FormatV1},
 	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Project") {
-			switch format {
-			case model.FormatV1:
-				r.add(SeverityError, code,
-					`required column "Sample_Project" is missing from the header`,
-					Location{Section: "Data", Row: -1})
-			case model.FormatV2:
-				r.add(SeverityError, code,
-					`required column "Sample_Project" is missing from the [Data] section`,
-					Location{Section: "Data", Row: -1, Column: "Sample_Project"})
-			}
+			r.add(SeverityError, code,
+				`required column "Sample_Project" is missing from the header`,
+				Location{Section: "Data", Row: -1})
+		}
+	},
+}
+
+// requireSampleProjectColumnV2: Illumina's v2 spec makes
+// Sample_Project optional, so its absence is only a warning.
+var requireSampleProjectColumnV2 = rule{
+	suffix:   "MISSING_SAMPLE_PROJECT",
+	severity: SeverityWarning,
+	formats:  []model.Format{model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+		if !sheetsColumnHeaderContains(s, "Sample_Project") {
+			r.add(SeverityWarning, code,
+				`column "Sample_Project" is missing from the [Data] section`,
+				Location{Section: "Data", Row: -1, Column: "Sample_Project"})
 		}
 	},
 }
@@ -386,7 +407,7 @@ var indexMatchesReads = rule{
 		if s.Reads == nil {
 			return
 		}
-		checkColumn := func(get func(model.Sample) string, declared int, col string) {
+		checkColumn := func(get func(model.Sample) string, declared int, col, readsKey string) {
 			if declared == 0 {
 				return
 			}
@@ -397,13 +418,13 @@ var indexMatchesReads = rule{
 				}
 				if len(v) != declared {
 					r.add(SeverityError, code,
-						fmt.Sprintf("%s length %d does not match [Reads] %s = %d", col, len(v), col, declared),
+						fmt.Sprintf("%s length %d does not match [Reads] %s = %d", col, len(v), readsKey, declared),
 						Location{Section: "Data", Row: i, Column: col})
 				}
 			}
 		}
-		checkColumn(func(s model.Sample) string { return s.Index }, s.Reads.Index1Cycles, "index")
-		checkColumn(func(s model.Sample) string { return s.Index2 }, s.Reads.Index2Cycles, "index2")
+		checkColumn(func(s model.Sample) string { return s.Index }, s.Reads.Index1Cycles, "index", "Index1Cycles")
+		checkColumn(func(s model.Sample) string { return s.Index2 }, s.Reads.Index2Cycles, "index2", "Index2Cycles")
 	},
 }
 
@@ -418,9 +439,11 @@ var warnNoAdapter = rule{
 				Location{Section: "Settings", Row: -1})
 			return
 		}
-		if s.Settings.Adapter == "" {
+		// Illumina's BCL Convert dialect names the Read 1 adapter
+		// "AdapterRead1" rather than "Adapter"; either one counts.
+		if settingsValue(s.Settings, "Adapter") == "" && settingsValue(s.Settings, "AdapterRead1") == "" {
 			r.add(SeverityWarning, code,
-				"Adapter is empty in [Settings]; consider specifying one",
+				"no Adapter sequence in [Settings]; consider specifying one",
 				Location{Section: "Settings", Row: -1, Column: "Adapter"})
 		}
 	},
@@ -477,4 +500,26 @@ func sheetsColumnHeaderContains(s *model.SampleSheet, name string) bool {
 		}
 	}
 	return false
+}
+
+// settingsValue returns the value of a settings key, matched
+// case-insensitively. The two typed fields are checked first, then the
+// Extra map, which holds the keys the model does not know about (e.g.
+// Illumina's "AdapterRead1").
+func settingsValue(s *model.Settings, key string) string {
+	if s == nil {
+		return ""
+	}
+	switch strings.ToLower(key) {
+	case "adapter":
+		return s.Adapter
+	case "adapterread2":
+		return s.AdapterRead2
+	}
+	for k, v := range s.Extra {
+		if strings.EqualFold(k, key) {
+			return v
+		}
+	}
+	return ""
 }
