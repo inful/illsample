@@ -173,6 +173,47 @@ func TestVerify_InvalidV2NoSampleID(t *testing.T) {
 	}
 }
 
+func TestVerify_V2OptionalColumnsAreWarnings(t *testing.T) {
+	// Illumina's v2 spec requires only Sample_ID and index, so the
+	// optional Sample_Name/Sample_Project columns must not fail the
+	// sheet.
+	sheet, err := parser.Parse(strings.NewReader(
+		"[Data]\nSample_ID,index\nid1,ATCGATCG\n[Reads]\nRead1Cycles,151\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	r := Verify(sheet)
+	if r.HasErrors() {
+		t.Errorf("expected no errors, got %d: %+v", len(r.Errors()), r.Errors())
+	}
+	c := codes(r)
+	if c["W_V2_MISSING_SAMPLE_NAME"] == 0 {
+		t.Errorf("expected W_V2_MISSING_SAMPLE_NAME, got codes: %v", c)
+	}
+	if c["W_V2_MISSING_SAMPLE_PROJECT"] == 0 {
+		t.Errorf("expected W_V2_MISSING_SAMPLE_PROJECT, got codes: %v", c)
+	}
+}
+
+func TestVerify_V2AdapterRead1CountsAsAdapter(t *testing.T) {
+	// Illumina names the Read 1 adapter "AdapterRead1"; a sheet that
+	// uses it must not be warned about a missing adapter.
+	sheet, err := parser.Parse(strings.NewReader(
+		"[Data]\nSample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCGATCG,P1\n" +
+			"[Reads]\nRead1Cycles,151\n" +
+			"[BCLConvert_Settings]\nAdapterRead1,AGATCG\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	r := Verify(sheet)
+	if r.HasErrors() {
+		t.Errorf("expected no errors, got %d: %+v", len(r.Errors()), r.Errors())
+	}
+	if c := codes(r); c["W_V2_NO_ADAPTER"] != 0 {
+		t.Errorf("unexpected W_V2_NO_ADAPTER, got codes: %v", c)
+	}
+}
+
 func TestVerify_PromoteWarningsToErrors(t *testing.T) {
 	sheet := &model.SampleSheet{
 		Format: model.FormatV2,
