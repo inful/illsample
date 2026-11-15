@@ -23,6 +23,9 @@ the project adheres to [Semantic Versioning](https://semver.org/).
   loses its values on round-trip.
 - `W_V2_INCONSISTENT_INDEX_IDS` now fires when only one of the two
   index-ID columns is present and only some rows fill it.
+- The README's release download URL pointed at an asset name that
+  never existed (`illsample_Linux_x86_64.tar.gz`); it now matches the
+  published archives, `illsample_<version>_<os>_<arch>.tar.gz`.
 - v2 detection no longer requires the first non-empty line to be a
   `[Section]` header. A text preamble (as in Illumina's v2 template)
   no longer makes a v2 sheet look like a v1 CSV.

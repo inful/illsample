@@ -15,7 +15,7 @@ GitHub Actions. A maintainer only needs to push a tag.
 
 3. Make sure `CHANGELOG.md` has an entry for the new version under
    the `[Unreleased]` heading. Move it under a new
-   `## [vX.Y.Z] - YYYY-MM-DD` heading.
+   `## [X.Y.Z] - YYYY-MM-DD` heading.
 
 4. Tag the release commit:
 
@@ -42,7 +42,7 @@ GitHub Actions. A maintainer only needs to push a tag.
    - Runs `go mod tidy` and `go test -race` (configured in the
      `before.hooks` block of `.goreleaser.yml`).
    - Builds binaries for `linux/darwin/windows/freebsd` on
-     `amd64/arm64` and `linux/darwin` on `386`.
+     `amd64/arm64` and `linux/freebsd` on `386`.
    - Packages each binary as `tar.gz` (or `zip` on Windows) with
      `LICENSE`, `README.md`, and `CHANGELOG.md` included.
    - Generates a `SHA256SUMS` file.

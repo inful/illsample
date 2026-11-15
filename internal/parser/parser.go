@@ -150,9 +150,11 @@ func unescapeCSVSafe(s string) string {
 	return s
 }
 
-// splitLines breaks s on \r\n, \n, or \r and returns each line without
-// the terminator. A line that does not fit in the scanner's buffer is
-// an error: dropping it would silently truncate the sheet.
+// splitLines breaks s on \n (a trailing \r is dropped) and returns each
+// line without the terminator. A file with old-Mac line endings
+// (\r only) is one single line, as encoding/csv reads it. A line that
+// does not fit in the scanner's buffer is an error: dropping it would
+// silently truncate the sheet.
 func splitLines(s string) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(strings.NewReader(s))

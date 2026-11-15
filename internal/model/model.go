@@ -94,9 +94,9 @@ type Sample struct {
 	// original column name from the source header. Nil when there are no
 	// such columns.
 	Extra map[string]string
-	// SourceRow is the zero-based row index in the source document, used
-	// for diagnostic messages. -1 for samples that were constructed
-	// programmatically.
+	// SourceRow is the zero-based line number of the row in the source
+	// document, counting the header line as 0. A sample that was
+	// constructed in code rather than parsed has the zero value.
 	SourceRow int
 }
 

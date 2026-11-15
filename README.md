@@ -42,17 +42,21 @@ go install github.com/inful/illsample/cmd/illsample@v0.2.0
 
 Pre-built binaries for Linux, macOS, Windows, and FreeBSD (amd64,
 arm64, 386 where supported) are attached to every
-[GitHub release](https://github.com/inful/illsample/releases). Grab
-the archive for your platform, extract it, and put the binary on
-your `PATH`.
+[GitHub release](https://github.com/inful/illsample/releases). Each
+archive is named `illsample_<version>_<os>_<arch>.tar.gz` (`zip` on
+Windows). Grab the archive for your platform, extract it, and put the
+binary on your `PATH`.
 
 ```bash
-# Example: Linux amd64
+# Example: Linux amd64, release v0.2.0
 curl -L -o illsample.tar.gz \
-  https://github.com/inful/illsample/releases/latest/download/illsample_Linux_x86_64.tar.gz
+  https://github.com/inful/illsample/releases/download/v0.2.0/illsample_0.2.0_linux_amd64.tar.gz
 tar -xzf illsample.tar.gz
 sudo mv illsample /usr/local/bin/
 ```
+
+The archive name carries the version, so take it from the release page
+at <https://github.com/inful/illsample/releases/latest>.
 
 Verify the SHA-256 sum against the `*_SHA256SUMS` file in the same
 release.
