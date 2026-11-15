@@ -392,9 +392,9 @@ func fieldFor(sample model.Sample, col string) string {
 // quote (`'`) which those applications treat as a literal-string
 // indicator. encoding/csv does not escape these characters on its own.
 //
-// This is a write-side concern. The parser does not strip the prefix on
-// re-read, so a round-trip leaves the safety character in the model
-// (the application can drop it after parsing if needed).
+// The parser strips that prefix again on read (see unescapeCSVSafe in
+// the parser package), so a parse → write → parse round-trip returns
+// the original value.
 //
 // Reference: OWASP "CSV Injection".
 func csvSafe(s string) string {

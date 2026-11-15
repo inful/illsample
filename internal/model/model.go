@@ -118,16 +118,10 @@ type Settings struct {
 	Extra        map[string]string
 }
 
-// Manifest is one row of the [Manifests] section. The IEM spec allows up to
-// six columns labelled A through F; we model them as positional fields. A
-// row with fewer than six values has empty strings for the missing ones.
+// Manifest is one row of the [Manifests] section: the path of one
+// manifest file. The section holds one path per line.
 type Manifest struct {
 	A string
-	B string
-	C string
-	D string
-	E string
-	F string
 }
 
 // Column describes a known column in the [Data] section. The first

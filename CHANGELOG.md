@@ -11,6 +11,18 @@ the project adheres to [Semantic Versioning](https://semver.org/).
   auto-detecting it.
 
 ### Fixed
+- A single-column `[Settings]` section is now read as a vertical
+  key/value list. With two keys the second value used to land in the
+  first key — the sheet carried the Read 2 adapter as the Read 1
+  adapter — and the second key was dropped.
+- Two columns that feed the same field (`Sample_ID` and its alias
+  `SampleID`) no longer pick a random winner: the parser walked a map,
+  so the same sheet could parse differently from one run to the next.
+  The first column in the header wins.
+- A v2 column header with surrounding whitespace (` Notes `) no longer
+  loses its values on round-trip.
+- `W_V2_INCONSISTENT_INDEX_IDS` now fires when only one of the two
+  index-ID columns is present and only some rows fill it.
 - v2 detection no longer requires the first non-empty line to be a
   `[Section]` header. A text preamble (as in Illumina's v2 template)
   no longer makes a v2 sheet look like a v1 CSV.
@@ -26,6 +38,10 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - `E_V2_INDEX_VS_READS` names the `[Reads]` key it compares against.
 - `illsample validate -strict` no longer prints a promoted warning
   twice, and counts it once.
+
+### Removed
+- `Manifest.B` … `Manifest.F`: the fields were never read from a
+  sheet nor written to one, so a value put there was silently dropped.
 
 ## [0.2.0] - 2026-10-15
 

@@ -72,19 +72,38 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 // columns to typed fields and preserving the rest in Extra. line is
 // the 1-based source line; it is stored on Sample.SourceRow so
 // downstream code can produce accurate diagnostic messages.
+//
+// The header is walked in column order rather than through the colIdx
+// map: a map has no order, so two columns that feed the same typed
+// field (e.g. "Sample_ID" and its alias "SampleID") would be filled
+// in a random order and the same sheet would parse differently from
+// one run to the next. The first column in the header wins.
 func v1RowToSample(row []string, header []string, colIdx map[string]int, line int) model.Sample {
 	s := model.Sample{SourceRow: line - 1}
-	for lcName, col := range colIdx {
+	filled := make(map[string]bool, len(header))
+	for col, name := range header {
+		lcName := strings.ToLower(strings.TrimSpace(name))
+		if lcName == "" {
+			continue
+		}
+		if colIdx[lcName] != col {
+			continue // a duplicate column name: the first one wins
+		}
 		if col >= len(row) {
 			continue // row is shorter than the header
 		}
 		value := unescapeCSVSafe(strings.TrimSpace(row[col]))
 		if c := model.ColumnByName(lcName); c != nil {
+			canonical := c.CanonicalName()
+			if filled[canonical] {
+				continue // an earlier column already filled this field
+			}
+			filled[canonical] = true
 			c.Set(&s, value)
 			continue
 		}
 		// Unknown column: preserve verbatim under its original name.
-		origName := strings.TrimSpace(header[col])
+		origName := strings.TrimSpace(name)
 		if origName == "" {
 			continue
 		}

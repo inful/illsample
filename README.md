@@ -173,6 +173,8 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 - `[Data]` is a CSV section with the canonical column order above.
 - `[Reads]` is a vertical key/value list: key on one line, value on the next.
 - `[Settings]` is a 2-column CSV: header row, then one or more value rows.
+  A single-column section is read as a vertical list instead: key on one
+  line, value on the next.
 - `[Manifests]` (optional) is a single column of manifest paths.
 - Any other section is preserved verbatim in `SampleSheet.Extra` so that
   round-trips are lossless.
@@ -273,6 +275,8 @@ send it, not just what the spec says:
   in v2 sheets.
 - **Empty `[Settings]`** and empty `[Manifests]` sections are treated
   as "no settings / no manifests" rather than as errors.
+- **Column names** are case-insensitive, and surrounding whitespace is
+  trimmed, so `" Notes"` and `Notes` are the same column.
 - **Unknown sections** are preserved verbatim in `sheet.Extra`, so a
   v2 sheet that contains DRAGEN-specific sections round-trips
   losslessly.

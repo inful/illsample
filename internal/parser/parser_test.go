@@ -329,6 +329,114 @@ func TestParseV2_CommentsAndBlankLines(t *testing.T) {
 	}
 }
 
+func TestParseV2_SettingsVerticalMultipleKeys(t *testing.T) {
+	// A single-column [Settings] section holds the key on one line and
+	// its value on the next. With two keys the second value used to
+	// land in the first key (the Read 2 adapter was written as the
+	// Read 1 adapter) and the second key was dropped.
+	input := "[Data]\n" +
+		"Sample_ID,Sample_Name,index,Sample_Project\n" +
+		"id1,name1,ATCG,P1\n" +
+		"[Reads]\nRead1Cycles\n151\n" +
+		"[Settings]\n" +
+		"Adapter\n" +
+		"AGATCGGAAGAGCACACGTCTGAACTCCAGTCA\n" +
+		"AdapterRead2\n" +
+		"AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Settings == nil {
+		t.Fatal("Settings is nil")
+	}
+	if got, want := sheet.Settings.Adapter, "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"; got != want {
+		t.Errorf("Adapter = %q, want %q", got, want)
+	}
+	if got, want := sheet.Settings.AdapterRead2, "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"; got != want {
+		t.Errorf("AdapterRead2 = %q, want %q", got, want)
+	}
+}
+
+func TestParseV2_SettingsVerticalUnknownSecondKey(t *testing.T) {
+	// The second key of a vertical section does not have to be one of
+	// the adapter names; a CamelCase name still starts a new key.
+	input := "[Data]\n" +
+		"Sample_ID,index\n" +
+		"id1,ATCG\n" +
+		"[Reads]\nRead1Cycles\n151\n" +
+		"[Settings]\n" +
+		"SoftwareVersion\n" +
+		"4.1.27\n" +
+		"OverrideCycles\n" +
+		"10\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := sheet.Settings.Extra["SoftwareVersion"], "4.1.27"; got != want {
+		t.Errorf("Extra[SoftwareVersion] = %q, want %q", got, want)
+	}
+	if got, want := sheet.Settings.Extra["OverrideCycles"], "10"; got != want {
+		t.Errorf("Extra[OverrideCycles] = %q, want %q", got, want)
+	}
+}
+
+func TestParseV1_DuplicateAliasColumnsFirstWins(t *testing.T) {
+	// A header with both "Sample_ID" and its alias "SampleID" feeds
+	// the same field twice. The parser used to walk a map, so the
+	// value came from a random column and the same sheet parsed
+	// differently from one run to the next.
+	input := "Sample_ID,SampleID,Sample_Name,index,Sample_Project\n" +
+		"first,second,name1,ATCG,P1\n"
+	for i := 0; i < 50; i++ {
+		sheet, err := Parse(strings.NewReader(input))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if got := sheet.Data[0].SampleID; got != "first" {
+			t.Fatalf("Data[0].SampleID = %q, want %q (first column wins)", got, "first")
+		}
+	}
+}
+
+func TestParseV2_DuplicateAliasColumnsFirstWins(t *testing.T) {
+	input := "[Data]\n" +
+		"Sample_ID,SampleID,index\n" +
+		"first,second,ATCG\n" +
+		"[Reads]\nRead1Cycles\n151\n"
+	for i := 0; i < 50; i++ {
+		sheet, err := Parse(strings.NewReader(input))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if got := sheet.Data[0].SampleID; got != "first" {
+			t.Fatalf("Data[0].SampleID = %q, want %q (first column wins)", got, "first")
+		}
+	}
+}
+
+func TestParseV2_HeaderWhitespaceTrimmed(t *testing.T) {
+	// A v2 header with surrounding whitespace must be trimmed, like
+	// the v1 header is. Otherwise the writer looks the column up as
+	// " Notes" in sample.Extra, where the key is "Notes", and the
+	// column's values are dropped on round-trip.
+	input := "[Data]\n" +
+		"Sample_ID,index, Notes \n" +
+		"id1,ATCG,keepme\n" +
+		"[Reads]\nRead1Cycles\n151\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got, want := sheet.Header[2], "Notes"; got != want {
+		t.Errorf("Header[2] = %q, want %q", got, want)
+	}
+	if got, want := sheet.Data[0].Extra["Notes"], "keepme"; got != want {
+		t.Errorf("Extra[Notes] = %q, want %q", got, want)
+	}
+}
+
 func TestParse_Empty(t *testing.T) {
 	_, err := Parse(strings.NewReader(""))
 	if err == nil {
