@@ -61,12 +61,12 @@ func Parse(r io.Reader) (*model.SampleSheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseBytes(data)
+	return parseBytes(data)
 }
 
-// ParseBytes is like Parse but takes a byte slice. The supplied slice
+// parseBytes is like Parse but takes a byte slice. The supplied slice
 // may begin with a UTF-8 BOM, which is stripped before parsing.
-func ParseBytes(data []byte) (*model.SampleSheet, error) {
+func parseBytes(data []byte) (*model.SampleSheet, error) {
 	text := stripBOM(data)
 	if !utf8.ValidString(text) {
 		return nil, &ParseError{Msg: "input is not valid UTF-8"}

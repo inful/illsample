@@ -437,6 +437,23 @@ func TestParseV2_HeaderWhitespaceTrimmed(t *testing.T) {
 	}
 }
 
+func TestParseErrorMessage(t *testing.T) {
+	// The line number is part of the message a user sees; it must
+	// appear only when there is one.
+	tests := []struct {
+		err  *ParseError
+		want string
+	}{
+		{&ParseError{Line: 7, Msg: "invalid CSV"}, "line 7: invalid CSV"},
+		{&ParseError{Msg: "empty input"}, "empty input"},
+	}
+	for _, tt := range tests {
+		if got := tt.err.Error(); got != tt.want {
+			t.Errorf("Error() = %q, want %q", got, tt.want)
+		}
+	}
+}
+
 func TestParse_Empty(t *testing.T) {
 	_, err := Parse(strings.NewReader(""))
 	if err == nil {

@@ -17,7 +17,7 @@ import (
 func parseV2(lines []string) (*model.SampleSheet, error) {
 	// Validate the entire line slice as UTF-8. This is a fast pass
 	// over the slice's underlying string (lines is built by
-	// splitLines from a string already validated by ParseBytes; for
+	// splitLines from a string already validated by parseBytes; for
 	// direct ParseV2 callers, we re-validate here).
 	for _, line := range lines {
 		if !utf8.ValidString(line) {
