@@ -9,8 +9,14 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - `illsample validate -f v1|v2` forces the input format instead of
   auto-detecting it.
+- A fuzz target for the writer (`go test -fuzz=FuzzWrite
+  ./internal/writer/`): the writer must not fail, and what it writes
+  must parse back to the same number of rows.
 
 ### Fixed
+- `illsample validate -h` printed the usage to stderr and exited 2.
+  Help now goes to stdout and exits 0; an unknown flag exits 2 with
+  "usage error" on stderr.
 - A single-column `[Settings]` section is now read as a vertical
   key/value list. With two keys the second value used to land in the
   first key — the sheet carried the Read 2 adapter as the Read 1
@@ -45,6 +51,10 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 - `Manifest.B` … `Manifest.F`: the fields were never read from a
   sheet nor written to one, so a value put there was silently dropped.
+- `01-REVIEW.md`: the review of the initial release. Every finding in
+  it is fixed and listed in this changelog, so the file only dated the
+  repo. It stays in the history, at
+  [`01-REVIEW.md`](https://github.com/inful/illsample/blob/2a3c049/01-REVIEW.md).
 
 ## [0.2.0] - 2026-10-15
 
@@ -109,9 +119,10 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - The 5 critical/high findings from the code review (CR-01,
   CR-02, HI-01, HI-02, HI-03) plus 17 of the 20 review warnings
-  and info items are addressed in this release. See
-  [`01-REVIEW.md`](01-REVIEW.md) for the full review; the
-  remaining 3 (IN-07 row-indexing convention, IN-09 CRLF
+  and info items are addressed in this release. The full review is
+  kept in the history, at
+  [`01-REVIEW.md`](https://github.com/inful/illsample/blob/2a3c049/01-REVIEW.md);
+  the remaining 3 (IN-07 row-indexing convention, IN-09 CRLF
   emission, WR-05 `\r` preservation) are deferred.
 - Project pushed to <https://github.com/inful/illsample>.
   All commits authored as `inful <inful@users.noreply.github.com>`.

@@ -69,6 +69,12 @@ func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
 		for i, col := range header {
 			row[i] = csvSafe(fieldFor(sample, col))
 		}
+		// shortcut: a one-column sheet with an empty cell is written
+		// as a blank line, which the reader skips, so that cell (or
+		// the header) is lost on the round-trip. CSV cannot tell a
+		// blank line from a row with one empty cell; a one-column
+		// sheet is not a valid sample sheet anyway. Upgrade by writing
+		// the cell as "".
 		if err := cw.Write(row); err != nil {
 			return fmt.Errorf("writer: write row: %w", err)
 		}

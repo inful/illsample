@@ -82,6 +82,37 @@ func main() {
 	}
 }
 
+// newFlagSet returns the flag set of a subcommand. The flag package
+// prints parse errors itself, so the output is muted here;
+// parseFlags decides where the usage text goes.
+func newFlagSet(name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(fs.Output(), "Usage: illsample %s [flags] <file>\n\nFlags:\n", name)
+		fs.PrintDefaults()
+	}
+	return fs
+}
+
+// parseFlags parses a subcommand's flags. It returns ok=false when
+// the command must stop, with the exit code to use: 2 for a usage
+// error, 0 for a help request (-h), which is not an error.
+func parseFlags(fs *flag.FlagSet, args []string) (exitCode int, ok bool) {
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
+			return 0, false
+		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintf(os.Stderr, "usage error: %v\n", err)
+		fs.Usage()
+		return 2, false
+	}
+	return 0, true
+}
+
 // runValidate implements the "validate" subcommand.
 //
 // Output goes to stderr for diagnostics (errors, warnings) and to
@@ -89,12 +120,12 @@ func main() {
 // counts). This means `illsample validate good.csv | sed ...` does
 // not mix error messages into the parsed stream.
 func runValidate(args []string) int {
-	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
+	fs := newFlagSet("validate")
 	strict := fs.Bool("strict", false, "treat warnings as errors")
 	noWarn := fs.Bool("no-warn", false, "suppress warnings from the output")
 	format := fs.String("f", "", "input format: v1 or v2 (default: auto-detect)")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "validate: expected exactly one file argument")
@@ -125,11 +156,11 @@ func runValidate(args []string) int {
 
 // runConvert implements the "convert" subcommand.
 func runConvert(args []string) int {
-	fs := flag.NewFlagSet("convert", flag.ContinueOnError)
+	fs := newFlagSet("convert")
 	out := fs.String("o", "", "output file (default: stdout)")
 	format := fs.String("f", "", "output format: v1 or v2 (default: the other one)")
-	if err := fs.Parse(args); err != nil {
-		return 2
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "convert: expected exactly one file argument")
@@ -181,9 +212,9 @@ func runConvert(args []string) int {
 
 // runInfo implements the "info" subcommand.
 func runInfo(args []string) int {
-	fs := flag.NewFlagSet("info", flag.ContinueOnError)
-	if err := fs.Parse(args); err != nil {
-		return 2
+	fs := newFlagSet("info")
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "info: expected exactly one file argument")

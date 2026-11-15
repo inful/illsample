@@ -216,6 +216,11 @@ func isV2(lines []string) bool {
 // left over from the Illumina template — so they contain spaces. A CSV
 // row is a sequence of short identifier-like fields ("Sample_ID,index")
 // instead. A line with two or more such fields is a row, not a note.
+//
+// shortcut: a line with a single field is read as a note, so a
+// one-column CSV whose rows look like section headers ("[Reads]") is
+// read as v2. Real sample sheets have more than one column; upgrade by
+// treating a single field as a row when no section header follows it.
 func preambleLine(s string) bool {
 	fields := 0
 	for _, f := range strings.Split(s, ",") {

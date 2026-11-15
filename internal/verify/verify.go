@@ -194,7 +194,7 @@ func VerifyWithOptions(sheet *model.SampleSheet, opts VerifyOptions) *Verificati
 			continue
 		}
 		code := issueCode(rule.severity, sheet.Format, rule.suffix)
-		rule.check(sheet.Format, sheet, code, r)
+		rule.check(sheet.Format, sheet, code, rule.severity, r)
 	}
 	if opts.SuppressWarnings {
 		r.Issues = filterOut(r.Issues, func(i Issue) bool { return i.Severity == SeverityWarning })

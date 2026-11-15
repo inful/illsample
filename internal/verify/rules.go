@@ -17,16 +17,18 @@ import (
 // applies to both v1 and v2 emits "E_V1_<suffix>" or "E_V2_<suffix>"
 // as appropriate without duplicating the check function.
 //
-// check is invoked once per matching sheet, with the matching format
-// and the pre-computed code string passed in. The closure may branch
-// on format to choose format-specific message text or Location
-// fields; the code is always the correct one for the format so it
-// can be used verbatim.
+// check is invoked once per matching sheet, with the matching format,
+// the pre-computed code string and the rule's severity passed in. The
+// severity is the rule's own, so a finding can never be reported with
+// a severity that disagrees with its code ("E_" for an error, "W_"
+// for a warning). The closure may branch on format to choose
+// format-specific message text or Location fields; the code is always
+// the correct one for the format so it can be used verbatim.
 type rule struct {
 	suffix   string
 	severity Severity
 	formats  []model.Format
-	check    func(format model.Format, sheet *model.SampleSheet, code string, r *VerificationResult)
+	check    func(format model.Format, sheet *model.SampleSheet, code string, sev Severity, r *VerificationResult)
 }
 
 // issueCode builds the public code for a finding.
@@ -105,14 +107,14 @@ var requireData = rule{
 	suffix:   "NO_DATA",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if len(s.Data) == 0 {
 			switch format {
 			case model.FormatV1:
-				r.add(SeverityError, code, "sheet has no data rows",
+				r.add(sev, code, "sheet has no data rows",
 					Location{Row: -1})
 			case model.FormatV2:
-				r.add(SeverityError, code, "[Data] section has no rows",
+				r.add(sev, code, "[Data] section has no rows",
 					Location{Section: "Data", Row: -1})
 			}
 		}
@@ -123,15 +125,15 @@ var requireSampleIDColumn = rule{
 	suffix:   "MISSING_SAMPLE_ID",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_ID") {
 			switch format {
 			case model.FormatV1:
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					`required column "Sample_ID" is missing from the header`,
 					Location{Section: "Data", Row: -1})
 			case model.FormatV2:
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					`required column "Sample_ID" is missing from the [Data] section`,
 					Location{Section: "Data", Row: -1, Column: "Sample_ID"})
 			}
@@ -144,9 +146,9 @@ var requireSampleNameColumnV1 = rule{
 	suffix:   "MISSING_SAMPLE_NAME",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Name") {
-			r.add(SeverityError, code,
+			r.add(sev, code,
 				`required column "Sample_Name" is missing from the header`,
 				Location{Section: "Data", Row: -1})
 		}
@@ -161,9 +163,9 @@ var requireSampleNameColumnV2 = rule{
 	suffix:   "MISSING_SAMPLE_NAME",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Name") {
-			r.add(SeverityWarning, code,
+			r.add(sev, code,
 				`column "Sample_Name" is missing from the [Data] section`,
 				Location{Section: "Data", Row: -1, Column: "Sample_Name"})
 		}
@@ -174,9 +176,9 @@ var requireSampleProjectColumnV1 = rule{
 	suffix:   "MISSING_SAMPLE_PROJECT",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Project") {
-			r.add(SeverityError, code,
+			r.add(sev, code,
 				`required column "Sample_Project" is missing from the header`,
 				Location{Section: "Data", Row: -1})
 		}
@@ -189,9 +191,9 @@ var requireSampleProjectColumnV2 = rule{
 	suffix:   "MISSING_SAMPLE_PROJECT",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if !sheetsColumnHeaderContains(s, "Sample_Project") {
-			r.add(SeverityWarning, code,
+			r.add(sev, code,
 				`column "Sample_Project" is missing from the [Data] section`,
 				Location{Section: "Data", Row: -1, Column: "Sample_Project"})
 		}
@@ -204,19 +206,19 @@ var requireIndexColumn = rule{
 	suffix:   "MISSING_INDEX",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		switch format {
 		case model.FormatV1:
 			has1 := sheetsColumnHeaderContains(s, "index")
 			has2 := sheetsColumnHeaderContains(s, "index2")
 			if !has1 && !has2 {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					`at least one of "index" or "index2" must be present`,
 					Location{Section: "Data", Row: -1})
 			}
 		case model.FormatV2:
 			if !sheetsColumnHeaderContains(s, "index") {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					`required column "index" is missing from the [Data] section`,
 					Location{Section: "Data", Row: -1, Column: "index"})
 			}
@@ -228,10 +230,10 @@ var noEmptySampleID = rule{
 	suffix:   "EMPTY_SAMPLE_ID",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		for i, sample := range s.Data {
 			if strings.TrimSpace(sample.SampleID) == "" {
-				r.add(SeverityError, code, "Sample_ID is empty",
+				r.add(sev, code, "Sample_ID is empty",
 					Location{Section: "Data", Row: i, Column: "Sample_ID"})
 			}
 		}
@@ -242,7 +244,7 @@ var noDuplicateSampleID = rule{
 	suffix:   "DUPLICATE_SAMPLE_ID",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		seen := make(map[string]int, len(s.Data))
 		for i, sample := range s.Data {
 			id := strings.TrimSpace(sample.SampleID)
@@ -250,7 +252,7 @@ var noDuplicateSampleID = rule{
 				continue
 			}
 			if prev, ok := seen[id]; ok {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					fmt.Sprintf("Sample_ID %q is also used in row %d", id, prev),
 					Location{Section: "Data", Row: i, Column: "Sample_ID"})
 				continue
@@ -264,15 +266,15 @@ var validIndex = rule{
 	suffix:   "INVALID_INDEX",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		for i, sample := range s.Data {
 			if sample.Index != "" && !isValidIndex(sample.Index) {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					fmt.Sprintf("index %q contains characters outside ACGTN", sample.Index),
 					Location{Section: "Data", Row: i, Column: "index"})
 			}
 			if sample.Index2 != "" && !isValidIndex(sample.Index2) {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					fmt.Sprintf("index2 %q contains characters outside ACGTN", sample.Index2),
 					Location{Section: "Data", Row: i, Column: "index2"})
 			}
@@ -284,7 +286,7 @@ var consistentIndexLength = rule{
 	suffix:   "INDEX_LENGTH_MISMATCH",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		checkColumn := func(get func(model.Sample) string, col string) {
 			firstLen := -1
 			firstRow := -1
@@ -299,7 +301,7 @@ var consistentIndexLength = rule{
 					continue
 				}
 				if len(v) != firstLen {
-					r.add(SeverityError, code,
+					r.add(sev, code,
 						fmt.Sprintf("%s length is %d but row %d has length %d", col, len(v), firstRow, firstLen),
 						Location{Section: "Data", Row: i, Column: col})
 				}
@@ -314,13 +316,13 @@ var validSampleName = rule{
 	suffix:   "INVALID_SAMPLE_NAME",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		for i, sample := range s.Data {
 			if sample.SampleName == "" {
 				continue
 			}
 			if hasInvalidNameChars(sample.SampleName) {
-				r.add(SeverityError, code,
+				r.add(sev, code,
 					fmt.Sprintf("Sample_Name %q contains illegal characters", sample.SampleName),
 					Location{Section: "Data", Row: i, Column: "Sample_Name"})
 			}
@@ -332,7 +334,7 @@ var warnInconsistentPlateWell = rule{
 	suffix:   "INCONSISTENT_PLATE_WELL",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if len(s.Data) < 2 {
 			return
 		}
@@ -345,7 +347,7 @@ var warnInconsistentPlateWell = rule{
 				anyMissing = true
 			}
 			if anyPlate && anyMissing {
-				r.add(SeverityWarning, code,
+				r.add(sev, code,
 					"some rows have Sample_Plate/Sample_Well while others do not",
 					Location{Section: "Data", Row: -1})
 				return
@@ -358,10 +360,10 @@ var warnLongSampleName = rule{
 	suffix:   "LONG_SAMPLE_NAME",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		for i, sample := range s.Data {
 			if len(sample.SampleName) > 100 {
-				r.add(SeverityWarning, code,
+				r.add(sev, code,
 					fmt.Sprintf("Sample_Name has %d characters; long names can cause filesystem issues", len(sample.SampleName)),
 					Location{Section: "Data", Row: i, Column: "Sample_Name"})
 			}
@@ -375,9 +377,9 @@ var requireReadsSection = rule{
 	suffix:   "NO_READS",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Reads == nil {
-			r.add(SeverityError, code, "[Reads] section is missing",
+			r.add(sev, code, "[Reads] section is missing",
 				Location{Section: "Reads", Row: -1})
 		}
 	},
@@ -387,13 +389,13 @@ var requireRead1Cycles = rule{
 	suffix:   "READ1_MISSING",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Reads == nil {
 			// Already reported by requireReadsSection.
 			return
 		}
 		if s.Reads.Read1Cycles <= 0 {
-			r.add(SeverityError, code, "[Reads] Read1Cycles is required",
+			r.add(sev, code, "[Reads] Read1Cycles is required",
 				Location{Section: "Reads", Row: -1, Column: "Read1Cycles"})
 		}
 	},
@@ -403,7 +405,7 @@ var indexMatchesReads = rule{
 	suffix:   "INDEX_VS_READS",
 	severity: SeverityError,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Reads == nil {
 			return
 		}
@@ -417,7 +419,7 @@ var indexMatchesReads = rule{
 					continue
 				}
 				if len(v) != declared {
-					r.add(SeverityError, code,
+					r.add(sev, code,
 						fmt.Sprintf("%s length %d does not match [Reads] %s = %d", col, len(v), readsKey, declared),
 						Location{Section: "Data", Row: i, Column: col})
 				}
@@ -432,9 +434,9 @@ var warnNoAdapter = rule{
 	suffix:   "NO_ADAPTER",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Settings == nil {
-			r.add(SeverityWarning, code,
+			r.add(sev, code,
 				"[Settings] section is absent; consider specifying an Adapter sequence",
 				Location{Section: "Settings", Row: -1})
 			return
@@ -442,7 +444,7 @@ var warnNoAdapter = rule{
 		// Illumina's BCL Convert dialect names the Read 1 adapter
 		// "AdapterRead1" rather than "Adapter"; either one counts.
 		if settingsValue(s.Settings, "Adapter") == "" && settingsValue(s.Settings, "AdapterRead1") == "" {
-			r.add(SeverityWarning, code,
+			r.add(sev, code,
 				"no Adapter sequence in [Settings]; consider specifying one",
 				Location{Section: "Settings", Row: -1, Column: "Adapter"})
 		}
@@ -453,7 +455,7 @@ var warnInconsistentIndexIDs = rule{
 	suffix:   "INCONSISTENT_INDEX_IDS",
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
-	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		// Each index-ID column is checked on its own: a sheet that
 		// carries only I7_Index_ID must still be warned when some
 		// rows fill it and others do not.
@@ -467,7 +469,7 @@ var warnInconsistentIndexIDs = rule{
 				}
 			}
 			if anyFilled && anyEmpty {
-				r.add(SeverityWarning, code,
+				r.add(sev, code,
 					"some rows have I7_Index_ID while others do not",
 					Location{Section: "Data", Row: -1, Column: "I7_Index_ID"})
 			}
@@ -482,7 +484,7 @@ var warnInconsistentIndexIDs = rule{
 				}
 			}
 			if anyFilled && anyEmpty {
-				r.add(SeverityWarning, code,
+				r.add(sev, code,
 					"some rows have I5_Index_ID/index2 while others do not",
 					Location{Section: "Data", Row: -1, Column: "I5_Index_ID"})
 			}

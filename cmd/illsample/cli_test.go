@@ -133,6 +133,33 @@ func TestCLI_Validate_ForceFormat(t *testing.T) {
 	}
 }
 
+func TestCLI_HelpFlag(t *testing.T) {
+	// Asking for help is not an error: the usage goes to stdout and
+	// the exit code is 0.
+	for _, cmd := range []string{"validate", "convert", "info"} {
+		t.Run(cmd, func(t *testing.T) {
+			stdout, _, exit := run(t, cmd, "-h")
+			if exit != 0 {
+				t.Errorf("exit = %d, want 0", exit)
+			}
+			if !strings.Contains(stdout, "Usage:") {
+				t.Errorf("stdout = %q, want the usage", stdout)
+			}
+		})
+	}
+}
+
+func TestCLI_UnknownFlag(t *testing.T) {
+	// An unknown flag is a usage error: exit 2, the message on stderr.
+	_, stderr, exit := run(t, "validate", "-bogus")
+	if exit != 2 {
+		t.Errorf("exit = %d, want 2", exit)
+	}
+	if !strings.Contains(stderr, "usage error") {
+		t.Errorf("stderr = %q, want to mention 'usage error'", stderr)
+	}
+}
+
 func TestCLI_Validate_NoArgs(t *testing.T) {
 	_, _, exit := run(t, "validate")
 	if exit != 2 {
