@@ -14,6 +14,10 @@ the project adheres to [Semantic Versioning](https://semver.org/).
   must parse back to the same number of rows.
 
 ### Fixed
+- A v1 sheet with a single column no longer loses a cell on the
+  round-trip: a cell that is empty was written as a blank line, and
+  the reader skips blank lines. Such a cell is written as the quoted
+  empty field now.
 - `illsample validate -h` printed the usage to stderr and exited 2.
   Help now goes to stdout and exits 0; an unknown flag exits 2 with
   "usage error" on stderr.
