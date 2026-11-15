@@ -550,6 +550,58 @@ func TestWriteV2_PaddedHeaderColumnPreserved(t *testing.T) {
 	}
 }
 
+// FuzzWrite exercises the writer with sheets built by the parser.
+// The writer must not fail, and what it writes must parse back to
+// the same number of rows.
+//
+// The re-parse forces the sheet's own format: the auto-detector
+// reads a one-column sheet whose rows look like section headers as
+// a v2 sheet, which is a property of the detection, not of the
+// writer.
+//
+// Use `go test -fuzz=FuzzWrite -fuzztime=10s` to run it.
+func FuzzWrite(f *testing.F) {
+	seeds := []string{
+		"Sample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCG,P1\n",
+		"[Data]\nSample_ID,index\nid1,ATCG\n[Reads]\nRead1Cycles\n151\n",
+		"[Data]\nSample_ID,index\nid1,ATCG\n[Reads]\nRead1Cycles,151\n[Settings]\nAdapter,AdapterRead2\nA,B\n",
+		"index\nATCG\n",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		sheet, err := parser.Parse(strings.NewReader(input))
+		if err != nil {
+			return // a sheet that does not parse is not the writer's problem
+		}
+		var buf bytes.Buffer
+		if err := Write(&buf, sheet); err != nil {
+			t.Fatalf("Write: %v", err)
+		}
+		written := buf.String()
+		// A one-column v1 sheet has no faithful CSV form: a cell that
+		// is empty becomes a blank line, and the reader skips blank
+		// lines. Such a sheet is not a valid sample sheet, so the
+		// round-trip is not checked for it — the writer still ran.
+		if sheet.Format == model.FormatV1 && len(sheet.Header) == 1 {
+			return
+		}
+		var round *model.SampleSheet
+		if sheet.Format == model.FormatV1 {
+			round, err = parser.ParseV1(strings.NewReader(written))
+		} else {
+			round, err = parser.ParseV2(strings.NewReader(written))
+		}
+		if err != nil {
+			t.Fatalf("written sheet does not parse back: %v\nwritten:\n%q", err, written)
+		}
+		if len(round.Data) != len(sheet.Data) {
+			t.Fatalf("row count changed: %d -> %d\nwritten:\n%q", len(sheet.Data), len(round.Data), written)
+		}
+	})
+}
+
 func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
 	// A column that is not in the header AND not an alias of a
 	// header column should be appended at the end of the header.

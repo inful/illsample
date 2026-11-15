@@ -334,6 +334,11 @@ func applyVerticalSettings(s *model.Settings, records []csvRecord) {
 // "SoftwareVersion") or contain an underscore; their values are DNA
 // sequences or version numbers. A line that looks like a name starts
 // a new key.
+//
+// shortcut: a value that looks like a name is read as a key. The
+// values Illumina writes are sequences and version numbers, so this
+// needs a hand-edited sheet to hit; upgrade by requiring the key to
+// be a name the parser knows.
 func isSettingsKey(line string) bool {
 	switch strings.ToLower(line) {
 	case "adapter", "adapterread1", "adapterread2":
