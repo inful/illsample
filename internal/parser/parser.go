@@ -36,9 +36,8 @@ import (
 // io.Reader. A real Illumina sample sheet is well under 500 KB
 // (1000 samples × ~500 bytes per row); 2 MB is a 4-5x headroom
 // limit that prevents a piped multi-GB file from OOMing the
-// process. Library users can override this var for tighter or
-// looser limits. Tests override it to exercise the boundary with
-// small inputs.
+// process. Tests lower this var to exercise the boundary with small
+// inputs.
 var maxInputSize = 2 * 1024 * 1024
 
 // readLimited reads up to maxInputSize+1 bytes from r. If the input
@@ -62,17 +61,20 @@ func Parse(r io.Reader) (*model.SampleSheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ParseBytes(data)
+	return parseBytes(data)
 }
 
-// ParseBytes is like Parse but takes a byte slice. The supplied slice
+// parseBytes is like Parse but takes a byte slice. The supplied slice
 // may begin with a UTF-8 BOM, which is stripped before parsing.
-func ParseBytes(data []byte) (*model.SampleSheet, error) {
+func parseBytes(data []byte) (*model.SampleSheet, error) {
 	text := stripBOM(data)
 	if !utf8.ValidString(text) {
 		return nil, &ParseError{Msg: "input is not valid UTF-8"}
 	}
-	lines := splitLines(text)
+	lines, err := splitLines(text)
+	if err != nil {
+		return nil, err
+	}
 	if len(stripBlankLines(lines)) == 0 {
 		return nil, &ParseError{Msg: "empty input"}
 	}
@@ -98,7 +100,10 @@ func ParseV2(r io.Reader) (*model.SampleSheet, error) {
 		return nil, err
 	}
 	text := stripBOM(data)
-	lines := splitLines(text)
+	lines, err := splitLines(text)
+	if err != nil {
+		return nil, err
+	}
 	if len(stripBlankLines(lines)) == 0 {
 		return nil, &ParseError{Msg: "empty input"}
 	}
@@ -145,9 +150,12 @@ func unescapeCSVSafe(s string) string {
 	return s
 }
 
-// splitLines breaks s on \r\n, \n, or \r and returns each line without
-// the terminator.
-func splitLines(s string) []string {
+// splitLines breaks s on \n (a trailing \r is dropped) and returns each
+// line without the terminator. A file with old-Mac line endings
+// (\r only) is one single line, as encoding/csv reads it. A line that
+// does not fit in the scanner's buffer is an error: dropping it would
+// silently truncate the sheet.
+func splitLines(s string) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(strings.NewReader(s))
 	// Sample sheets are small; raise the buffer cap so a pathological
@@ -156,7 +164,10 @@ func splitLines(s string) []string {
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
-	return lines
+	if err := scanner.Err(); err != nil {
+		return nil, &ParseError{Msg: fmt.Sprintf("read input: %v", err)}
+	}
+	return lines, nil
 }
 
 // stripBlankLines returns lines with the leading and trailing empty

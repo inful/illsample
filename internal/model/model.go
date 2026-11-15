@@ -94,9 +94,9 @@ type Sample struct {
 	// original column name from the source header. Nil when there are no
 	// such columns.
 	Extra map[string]string
-	// SourceRow is the zero-based row index in the source document, used
-	// for diagnostic messages. -1 for samples that were constructed
-	// programmatically.
+	// SourceRow is the zero-based line number of the row in the source
+	// document, counting the header line as 0. A sample that was
+	// constructed in code rather than parsed has the zero value.
 	SourceRow int
 }
 
@@ -118,16 +118,10 @@ type Settings struct {
 	Extra        map[string]string
 }
 
-// Manifest is one row of the [Manifests] section. The IEM spec allows up to
-// six columns labelled A through F; we model them as positional fields. A
-// row with fewer than six values has empty strings for the missing ones.
+// Manifest is one row of the [Manifests] section: the path of one
+// manifest file. The section holds one path per line.
 type Manifest struct {
 	A string
-	B string
-	C string
-	D string
-	E string
-	F string
 }
 
 // Column describes a known column in the [Data] section. The first

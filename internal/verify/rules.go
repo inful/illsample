@@ -454,36 +454,38 @@ var warnInconsistentIndexIDs = rule{
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
 	check: func(format model.Format, s *model.SampleSheet, code string, r *VerificationResult) {
-		hasI5Col := sheetsColumnHeaderContains(s, "I5_Index_ID")
-		hasI7Col := sheetsColumnHeaderContains(s, "I7_Index_ID")
-		if !hasI5Col || !hasI7Col {
-			return
-		}
-		anyI7Empty := false
-		anyI5Empty := false
-		anyI7Filled := false
-		anyI5Filled := false
-		for _, sample := range s.Data {
-			if sample.I7IndexID == "" {
-				anyI7Empty = true
-			} else {
-				anyI7Filled = true
+		// Each index-ID column is checked on its own: a sheet that
+		// carries only I7_Index_ID must still be warned when some
+		// rows fill it and others do not.
+		if sheetsColumnHeaderContains(s, "I7_Index_ID") {
+			anyEmpty, anyFilled := false, false
+			for _, sample := range s.Data {
+				if sample.I7IndexID == "" {
+					anyEmpty = true
+				} else {
+					anyFilled = true
+				}
 			}
-			if sample.I5IndexID == "" || sample.Index2 == "" {
-				anyI5Empty = true
-			} else {
-				anyI5Filled = true
+			if anyFilled && anyEmpty {
+				r.add(SeverityWarning, code,
+					"some rows have I7_Index_ID while others do not",
+					Location{Section: "Data", Row: -1, Column: "I7_Index_ID"})
 			}
 		}
-		if anyI7Filled && anyI7Empty {
-			r.add(SeverityWarning, code,
-				"some rows have I7_Index_ID while others do not",
-				Location{Section: "Data", Row: -1, Column: "I7_Index_ID"})
-		}
-		if anyI5Filled && anyI5Empty {
-			r.add(SeverityWarning, code,
-				"some rows have I5_Index_ID/index2 while others do not",
-				Location{Section: "Data", Row: -1, Column: "I5_Index_ID"})
+		if sheetsColumnHeaderContains(s, "I5_Index_ID") {
+			anyEmpty, anyFilled := false, false
+			for _, sample := range s.Data {
+				if sample.I5IndexID == "" || sample.Index2 == "" {
+					anyEmpty = true
+				} else {
+					anyFilled = true
+				}
+			}
+			if anyFilled && anyEmpty {
+				r.add(SeverityWarning, code,
+					"some rows have I5_Index_ID/index2 while others do not",
+					Location{Section: "Data", Row: -1, Column: "I5_Index_ID"})
+			}
 		}
 	},
 }

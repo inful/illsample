@@ -17,7 +17,7 @@ import (
 func parseV2(lines []string) (*model.SampleSheet, error) {
 	// Validate the entire line slice as UTF-8. This is a fast pass
 	// over the slice's underlying string (lines is built by
-	// splitLines from a string already validated by ParseBytes; for
+	// splitLines from a string already validated by parseBytes; for
 	// direct ParseV2 callers, we re-validate here).
 	for _, line := range lines {
 		if !utf8.ValidString(line) {
@@ -113,6 +113,13 @@ func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
 		return nil
 	}
 	header := records[0]
+	// Trim whitespace from the header names, like the v1 parser does.
+	// Without this the writer looks the column up as " Notes" in
+	// sample.Extra, where the key is "Notes", and the column's values
+	// are dropped on round-trip.
+	for i, h := range header {
+		header[i] = strings.TrimSpace(h)
+	}
 	sheet.Header = append(sheet.Header, header...)
 	colIdx := make(map[string]int, len(header))
 	for i, name := range header {
@@ -191,10 +198,12 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 
 // parseSettingsSection reads a settings section.
 //
-// Two layouts exist. IEM's [Settings] is a 2-column CSV: the first
+// Three layouts exist. IEM's [Settings] is a 2-column CSV: the first
 // row is the header, subsequent rows are values. Illumina's BCL
 // Convert dialect ([BCLConvert_Settings]) writes one "Key,Value" pair
-// per row instead; pairForm selects that layout.
+// per row instead; pairForm selects that layout. A section with a
+// single column is a vertical list: the key is on one line and its
+// value on the next.
 //
 // In the header/value layout, later rows override earlier ones
 // (last-non-empty wins). This is the behaviour bcl2fastq effectively
@@ -232,6 +241,11 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet, pairForm bool
 			}
 			applySetting(sheet.Settings, key, value)
 		}
+		return nil
+	}
+	if len(records[0]) == 1 {
+		// A single-column section is a vertical key/value list.
+		applyVerticalSettings(sheet.Settings, records)
 		return nil
 	}
 	header := records[0]
@@ -282,13 +296,66 @@ func applySetting(s *model.Settings, key, value string) {
 	}
 }
 
-// parseManifestsSection reads a [Manifests] section. IEM allows a single
-// column of manifest identifiers (A, B, ...). Some real-world sheets
-// emit a header row that duplicates the column letter (a literal "A");
-// we skip that row when it is followed by at least one more
-// non-empty, non-comment line in the section, which is a good
-// approximation of "this row is a header because there's actual data
-// after it."
+// applyVerticalSettings reads a single-column [Settings] section: the
+// key is on one line and its value on the next.
+//
+// A line that names a setting starts a new key; every other line is
+// another value for the key above it, and the last non-empty value
+// wins. Without the "names a setting" test a vertical section with
+// two keys would put the second key's value into the first key and
+// drop the second key entirely — the sheet would then carry the
+// Read 2 adapter as the Read 1 adapter.
+func applyVerticalSettings(s *model.Settings, records []csvRecord) {
+	key := ""
+	value := ""
+	for _, rec := range records {
+		line := strings.TrimSpace(strings.Join(rec, ","))
+		if line == "" {
+			continue
+		}
+		if key == "" || isSettingsKey(line) {
+			if key != "" && value != "" {
+				applySetting(s, key, value)
+			}
+			key, value = line, ""
+			continue
+		}
+		value = line
+	}
+	if key != "" && value != "" {
+		applySetting(s, key, value)
+	}
+}
+
+// isSettingsKey reports whether a line in a single-column [Settings]
+// section names a setting.
+//
+// Illumina setting names are CamelCase ("Adapter", "AdapterRead2",
+// "SoftwareVersion") or contain an underscore; their values are DNA
+// sequences or version numbers. A line that looks like a name starts
+// a new key.
+func isSettingsKey(line string) bool {
+	switch strings.ToLower(line) {
+	case "adapter", "adapterread1", "adapterread2":
+		return true
+	}
+	if strings.Contains(line, "_") {
+		return true
+	}
+	for i := 0; i+1 < len(line); i++ {
+		if line[i] >= 'A' && line[i] <= 'Z' && line[i+1] >= 'a' && line[i+1] <= 'z' {
+			return true
+		}
+	}
+	return false
+}
+
+// parseManifestsSection reads a [Manifests] section: one manifest path
+// per line. Some real-world sheets emit a header row that duplicates
+// the column letter (a literal "A"); we skip that row when it is
+// followed by at least one more non-empty, non-comment line in the
+// section, which is a good approximation of "this row is a header
+// because there's actual data after it."
 func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
 	// Collect the section's raw lines so we can look ahead.
 	var raw []string

@@ -344,6 +344,25 @@ func TestVerify_V2IndexIDsInconsistent(t *testing.T) {
 	}
 }
 
+func TestVerify_V2IndexIDsInconsistentWithoutI5Column(t *testing.T) {
+	// A sheet that carries only I7_Index_ID must still be warned when
+	// some rows fill it and others do not.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "Sample_Name", "I7_Index_ID", "index", "Sample_Project"},
+		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "n1", I7IndexID: "UDI1", Index: "ATCGATCG", SampleProject: "P1"},
+			{SampleID: "id2", SampleName: "n2", Index: "GCTAGCTA", SampleProject: "P1"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	if c["W_V2_INCONSISTENT_INDEX_IDS"] == 0 {
+		t.Errorf("expected W_V2_INCONSISTENT_INDEX_IDS, got codes: %v", c)
+	}
+}
+
 func TestIsValidIndex(t *testing.T) {
 	tests := []struct {
 		in   string

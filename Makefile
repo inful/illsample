@@ -7,7 +7,7 @@
 #   make cover-html    Write an HTML coverage report to coverage.html
 #   make fuzz          Run a short fuzz pass on the parser
 #   make vet           Run go vet
-#   make fmt           Run gofmt and goimports
+#   make fmt           Run gofmt
 #   make clean         Remove build artifacts
 #   make install       Install the CLI to $GOPATH/bin
 #

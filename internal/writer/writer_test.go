@@ -525,6 +525,31 @@ func TestWriteV2_PreservesExtraColumnsFromHeaderOnly(t *testing.T) {
 	}
 }
 
+func TestWriteV2_PaddedHeaderColumnPreserved(t *testing.T) {
+	// A v2 header column with surrounding whitespace must keep its
+	// values on round-trip. The parser trims the header, so the
+	// writer has to look the column up under the trimmed name.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "index", "Notes"},
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Data: []model.Sample{
+			{SampleID: "id1", Index: "ATCGATCG", Extra: map[string]string{"Notes": "keepme"}},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	round, err := parser.Parse(&buf)
+	if err != nil {
+		t.Fatalf("Parse round-trip: %v", err)
+	}
+	if got := round.Data[0].Extra["Notes"]; got != "keepme" {
+		t.Errorf("Extra[Notes] = %q, want keepme", got)
+	}
+}
+
 func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
 	// A column that is not in the header AND not an alias of a
 	// header column should be appended at the end of the header.
