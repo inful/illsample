@@ -33,7 +33,7 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 	// first section.
 	for !p.eof() {
 		t := strings.TrimSpace(p.lines[p.pos])
-		if t == "" || comment(t) {
+		if isBlankLine(t) || comment(t) || isInstructionLine(t) {
 			p.pos++
 			continue
 		}
@@ -137,16 +137,23 @@ func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
 	return nil
 }
 
-// parseReadsSection reads a [Reads] section. Two layouts exist: IEM
-// puts the key on one line and the value on the next, while Illumina's
-// BCL Convert dialect writes "Key,Value" on a single line. A line
-// that contains a comma is the latter; otherwise the value is on the
-// next line.
+// parseReadsSection reads a [Reads] section. Three layouts exist.
+//
+// Illumina's Sample Sheet specification holds one cycle count per
+// line, in order: read 1, then read 2. The index reads are not part
+// of this section; their length follows from the index sequence.
+//
+// Illumina's BCL Convert dialect writes "Key,Value" on a single
+// line, and IEM puts the key on one line and the value on the next.
+// A line that contains a comma is the former, a line that is a plain
+// number is the specification's layout, anything else is a key whose
+// value is on the next line.
 func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 	if sheet.Reads == nil {
 		sheet.Reads = &model.Reads{}
 	}
 	var key string
+	read := 0 // the next bare cycle count: read 1, then read 2
 	for {
 		line, ok := p.peek(0)
 		if !ok {
@@ -156,7 +163,7 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 		if isSectionHeader(trimmed) {
 			break
 		}
-		if trimmed == "" || comment(trimmed) {
+		if isBlankLine(trimmed) || comment(trimmed) || isInstructionLine(trimmed) {
 			p.next()
 			continue
 		}
@@ -164,7 +171,22 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 		value := ""
 		if key == "" {
 			if k, v, found := strings.Cut(trimmed, ","); found {
+				// The value is the second field; the commas after it
+				// are the padding the specification allows.
+				v, _, _ = strings.Cut(v, ",")
 				key, value = strings.TrimSpace(k), strings.TrimSpace(v)
+			} else if n, err := strconv.Atoi(trimmed); err == nil {
+				// A plain number: the cycle count of the next read.
+				if read == 2 {
+					return p.errAt("[Reads] holds one cycle count per read (read 1, read 2), got a third")
+				}
+				if read == 0 {
+					sheet.Reads.Read1Cycles = n
+				} else {
+					sheet.Reads.Read2Cycles = n
+				}
+				read++
+				continue
 			} else {
 				key = trimmed
 				continue
@@ -198,12 +220,13 @@ func parseReadsSection(p *lineParser, sheet *model.SampleSheet) error {
 
 // parseSettingsSection reads a settings section.
 //
-// Three layouts exist. IEM's [Settings] is a 2-column CSV: the first
-// row is the header, subsequent rows are values. Illumina's BCL
-// Convert dialect ([BCLConvert_Settings]) writes one "Key,Value" pair
-// per row instead; pairForm selects that layout. A section with a
-// single column is a vertical list: the key is on one line and its
-// value on the next.
+// Three layouts exist. Illumina's specification and the MiSeq guide
+// both write one "Key,Value" pair per line. Illumina's BCL Convert
+// dialect writes the same pairs under a different section name, and
+// IEM's [Settings] is a table: the first row holds the setting names,
+// the rows after it hold the values. A section with a single column
+// is a vertical list: the key is on one line and its value on the
+// next.
 //
 // In the header/value layout, later rows override earlier ones
 // (last-non-empty wins). This is the behaviour bcl2fastq effectively
@@ -226,7 +249,7 @@ func parseSettingsSection(p *lineParser, sheet *model.SampleSheet, pairForm bool
 	if sheet.Settings == nil {
 		sheet.Settings = &model.Settings{}
 	}
-	if pairForm {
+	if pairForm || isPairSettings(records) {
 		for _, rec := range records {
 			if len(rec) == 0 {
 				continue
@@ -296,6 +319,40 @@ func applySetting(s *model.Settings, key, value string) {
 	}
 }
 
+// isPairSettings reports whether a settings section is a list of
+// "Key,Value" pairs, the layout in Illumina's Sample Sheet
+// specification, rather than a table with a header row.
+//
+// The two layouts look alike when the table has two columns: in the
+// pair layout the second field of the first record is a value, in the
+// table layout it is the name of the next setting.
+func isPairSettings(records []csvRecord) bool {
+	if len(records) == 0 || len(records[0]) != 2 {
+		return false
+	}
+	if !isSettingName(records[0][1]) {
+		return true
+	}
+	// With a second record the table layout holds values there, while
+	// the pair layout holds the name of the next setting.
+	return len(records) > 1 && isSettingName(records[1][0])
+}
+
+// isSettingName reports whether a field looks like the name of a
+// setting rather than its value. Illumina's setting names are words
+// ("Adapter", "outputgenomevcf"); its values are sequences, numbers
+// or flags.
+func isSettingName(s string) bool {
+	if s == "" {
+		return false
+	}
+	if isSettingsKey(s) {
+		return true
+	}
+	// A lower-case word without digits is a name too.
+	return s == strings.ToLower(s) && !strings.ContainsAny(s, "0123456789")
+}
+
 // applyVerticalSettings reads a single-column [Settings] section: the
 // key is on one line and its value on the next.
 //
@@ -355,12 +412,12 @@ func isSettingsKey(line string) bool {
 	return false
 }
 
-// parseManifestsSection reads a [Manifests] section: one manifest path
-// per line. Some real-world sheets emit a header row that duplicates
-// the column letter (a literal "A"); we skip that row when it is
-// followed by at least one more non-empty, non-comment line in the
-// section, which is a good approximation of "this row is a header
-// because there's actual data after it."
+// parseManifestsSection reads a [Manifests] section.
+//
+// Illumina's specification writes one "Key,Filename" pair per line;
+// the key is the label that the Data section's Manifest column refers
+// to. IEM writes one path per line under a column letter, which is
+// read as the key of the paths below it.
 func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
 	// Collect the section's raw lines so we can look ahead.
 	var raw []string
@@ -373,22 +430,41 @@ func parseManifestsSection(p *lineParser, sheet *model.SampleSheet) error {
 		if isSectionHeader(trimmed) {
 			break
 		}
-		if trimmed == "" || comment(trimmed) {
+		if isBlankLine(trimmed) || comment(trimmed) || isInstructionLine(trimmed) {
 			p.next()
 			continue
 		}
 		raw = append(raw, trimmed)
 		p.next()
 	}
-	// Detect and drop a single leading "A" header row.
-	if len(raw) >= 2 && raw[0] == "A" {
+	// A leading column letter is the key of the paths below it.
+	key := ""
+	if len(raw) > 0 && isColumnLetter(raw[0]) {
+		key = raw[0]
+		if len(raw) == 1 {
+			// The section holds nothing but the column letter.
+			sheet.Manifests = append(sheet.Manifests, model.Manifest{Key: key})
+			return nil
+		}
 		raw = raw[1:]
 	}
 	for _, line := range raw {
-		m := model.Manifest{A: line}
+		m := model.Manifest{Key: key}
+		if k, filename, found := strings.Cut(line, ","); found {
+			m.Key = strings.TrimSpace(k)
+			m.Filename = strings.TrimSpace(filename)
+		} else {
+			m.Filename = line
+		}
 		sheet.Manifests = append(sheet.Manifests, m)
 	}
 	return nil
+}
+
+// isColumnLetter reports whether s is one of the column letters A to
+// F that IEM uses for the [Manifests] section.
+func isColumnLetter(s string) bool {
+	return len(s) == 1 && s[0] >= 'A' && s[0] <= 'F'
 }
 
 // parseUnknownSection preserves a section that the model does not know
@@ -449,7 +525,7 @@ func collectSection(p *lineParser) ([]string, int, error) {
 		if isSectionHeader(trimmed) {
 			return raw, startLine, nil
 		}
-		if trimmed == "" || comment(trimmed) {
+		if isBlankLine(trimmed) || comment(trimmed) || isInstructionLine(trimmed) {
 			p.next()
 			continue
 		}

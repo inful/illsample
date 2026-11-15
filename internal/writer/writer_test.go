@@ -550,6 +550,21 @@ func TestWriteV2_PaddedHeaderColumnPreserved(t *testing.T) {
 	}
 }
 
+// sampleIsEmpty reports whether a sample carries no value at all.
+func sampleIsEmpty(s model.Sample) bool {
+	if s.SampleID != "" || s.SampleName != "" || s.Index != "" || s.Index2 != "" ||
+		s.SampleProject != "" || s.Description != "" || s.SamplePlate != "" ||
+		s.SampleWell != "" || s.I7IndexID != "" || s.I5IndexID != "" {
+		return false
+	}
+	for _, v := range s.Extra {
+		if v != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // FuzzWrite exercises the writer with sheets built by the parser.
 // The writer must not fail, and what it writes must parse back to
 // the same number of rows.
@@ -590,7 +605,18 @@ func FuzzWrite(f *testing.F) {
 			t.Fatalf("written sheet does not parse back: %v\nwritten:\n%q", err, written)
 		}
 		if len(round.Data) != len(sheet.Data) {
-			t.Fatalf("row count changed: %d -> %d\nwritten:\n%q", len(sheet.Data), len(round.Data), written)
+			// A row whose values are all empty is written as a line of
+			// only commas, which the specification calls valid but
+			// ignored. Such a row does not survive the round-trip.
+			empty := 0
+			for _, s := range sheet.Data {
+				if sampleIsEmpty(s) {
+					empty++
+				}
+			}
+			if len(sheet.Data)-empty != len(round.Data) {
+				t.Fatalf("row count changed: %d -> %d\nwritten:\n%q", len(sheet.Data), len(round.Data), written)
+			}
 		}
 	})
 }

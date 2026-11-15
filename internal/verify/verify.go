@@ -243,6 +243,21 @@ func isValidIndex(s string) bool {
 	return true
 }
 
+// badSampleIDChars returns the first character of s that the
+// sequencing specification does not allow in a Sample_ID: only
+// letters, digits, dashes and underscores are permitted.
+func badSampleIDChars(s string) string {
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return string(r)
+		}
+	}
+	return ""
+}
+
 // hasInvalidNameChars reports whether s contains any character that
 // bcl2fastq will refuse. Empirically the restriction is: no control
 // characters and no whitespace. Characters like '/' and '\\' are NOT

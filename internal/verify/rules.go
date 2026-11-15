@@ -85,6 +85,8 @@ var allRules = []rule{
 	// Per-row: row-level integrity.
 	noEmptySampleID,
 	noDuplicateSampleID,
+	validSampleID,
+	sampleIDLength,
 	validIndex,
 	consistentIndexLength,
 	indexMatchesReads, // v2 only
@@ -92,6 +94,7 @@ var allRules = []rule{
 
 	// Warnings.
 	warnNoAdapter, // v2 only
+	warnDuplicateColumn,
 	warnInconsistentPlateWell,
 	warnInconsistentIndexIDs, // v2 only
 	warnLongSampleName,
@@ -330,6 +333,69 @@ var validSampleName = rule{
 	},
 }
 
+// validSampleID: the sequencing specification restricts the
+// Sample_ID to letters, digits, dashes and underscores.
+var validSampleID = rule{
+	suffix:   "INVALID_SAMPLE_ID",
+	severity: SeverityError,
+	formats:  []model.Format{model.FormatV1, model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
+		for i, sample := range s.Data {
+			id := sample.SampleID
+			if id == "" {
+				continue // reported by noEmptySampleID
+			}
+			if bad := badSampleIDChars(id); bad != "" {
+				r.add(sev, code,
+					fmt.Sprintf("Sample_ID %q contains %q; only letters, digits, dashes and underscores are allowed", id, bad),
+					Location{Section: "Data", Row: i, Column: "Sample_ID"})
+			}
+		}
+	},
+}
+
+// sampleIDLength: the sequencing specification limits the Sample_ID
+// to 100 characters.
+var sampleIDLength = rule{
+	suffix:   "LONG_SAMPLE_ID",
+	severity: SeverityError,
+	formats:  []model.Format{model.FormatV1, model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
+		for i, sample := range s.Data {
+			if len(sample.SampleID) > 100 {
+				r.add(sev, code,
+					fmt.Sprintf("Sample_ID has %d characters; at most 100 are allowed", len(sample.SampleID)),
+					Location{Section: "Data", Row: i, Column: "Sample_ID"})
+			}
+		}
+	},
+}
+
+// warnDuplicateColumn: the section requirements say that the column
+// headers of a data section must all be unique. A repeated column
+// name is ignored by bcl2fastq, so the first one wins here too.
+var warnDuplicateColumn = rule{
+	suffix:   "DUPLICATE_COLUMN",
+	severity: SeverityWarning,
+	formats:  []model.Format{model.FormatV1, model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
+		seen := make(map[string]bool, len(s.Header))
+		for _, h := range s.Header {
+			name := strings.ToLower(strings.TrimSpace(h))
+			if name == "" {
+				continue
+			}
+			if seen[name] {
+				r.add(sev, code,
+					fmt.Sprintf("column %q appears more than once in the header", h),
+					Location{Section: "Data", Row: -1, Column: h})
+				continue
+			}
+			seen[name] = true
+		}
+	},
+}
+
 var warnInconsistentPlateWell = rule{
 	suffix:   "INCONSISTENT_PLATE_WELL",
 	severity: SeverityWarning,
@@ -495,11 +561,20 @@ var warnInconsistentIndexIDs = rule{
 // ---- helpers --------------------------------------------------------------
 
 // sheetsColumnHeaderContains reports whether the sheet's data header
-// contains the given column name. The check is case-insensitive.
+// contains the given column.
+//
+// The check is case-insensitive and accepts every spelling the model
+// knows: the MiSeq guide writes the identifier column "SampleID",
+// the sequencing specification writes "Sample_ID", and both are the
+// same column.
 func sheetsColumnHeaderContains(s *model.SampleSheet, name string) bool {
 	want := strings.ToLower(name)
 	for _, h := range s.Header {
-		if strings.ToLower(h) == want {
+		lh := strings.ToLower(strings.TrimSpace(h))
+		if lh == want {
+			return true
+		}
+		if c := model.ColumnByName(lh); c != nil && strings.ToLower(c.CanonicalName()) == want {
 			return true
 		}
 	}

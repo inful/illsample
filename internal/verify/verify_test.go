@@ -327,6 +327,82 @@ func TestVerify_LongSampleName(t *testing.T) {
 	}
 }
 
+func TestVerify_SampleIDCharacters(t *testing.T) {
+	// The specification allows letters, digits, dashes and underscores
+	// in a Sample_ID, and nothing else.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "index"},
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Data: []model.Sample{
+			{SampleID: "id-1_ok", Index: "ATCGATCG"},
+			{SampleID: "id 2", Index: "GCTAGCTA"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	if c["E_V2_INVALID_SAMPLE_ID"] != 1 {
+		t.Errorf("expected 1 E_V2_INVALID_SAMPLE_ID, got codes: %v", c)
+	}
+}
+
+func TestVerify_SampleIDTooLong(t *testing.T) {
+	// The specification limits the Sample_ID to 100 characters.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "index"},
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Data: []model.Sample{
+			{SampleID: strings.Repeat("x", 101), Index: "ATCGATCG"},
+			{SampleID: strings.Repeat("x", 100), Index: "GCTAGCTA"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	if c["E_V2_LONG_SAMPLE_ID"] != 1 {
+		t.Errorf("expected 1 E_V2_LONG_SAMPLE_ID, got codes: %v", c)
+	}
+}
+
+func TestVerify_MiSeqColumnSpellings(t *testing.T) {
+	// The MiSeq guide writes the identifier column "SampleID". The
+	// verifier must accept it, like the parser does.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"SampleID", "Sample_Name", "Index", "Index2"},
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Data: []model.Sample{
+			{SampleID: "A10001", SampleName: "Sample_A", Index: "ATTACTCG", Index2: "TATAGCCT"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	if c["E_V2_MISSING_SAMPLE_ID"] != 0 {
+		t.Errorf("unexpected E_V2_MISSING_SAMPLE_ID, got codes: %v", c)
+	}
+	if r.HasErrors() {
+		t.Errorf("expected no errors, got %d: %+v", len(r.Errors()), r.Errors())
+	}
+}
+
+func TestVerify_DuplicateColumn(t *testing.T) {
+	// The section requirements say that the column headers must all be
+	// unique; a repeated name is ignored, so the first one wins.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: []string{"Sample_ID", "index", "Index"},
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Data: []model.Sample{
+			{SampleID: "id1", Index: "ATCGATCG"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	if c["W_V2_DUPLICATE_COLUMN"] != 1 {
+		t.Errorf("expected 1 W_V2_DUPLICATE_COLUMN, got codes: %v", c)
+	}
+}
+
 func TestVerify_V2IndexIDsInconsistent(t *testing.T) {
 	sheet := &model.SampleSheet{
 		Format: model.FormatV2,
