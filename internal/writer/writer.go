@@ -61,7 +61,7 @@ func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
 	var buf bytes.Buffer
 	cw := csv.NewWriter(&buf)
 	cw.UseCRLF = false
-	if err := cw.Write(header); err != nil {
+	if err := writeCSVRow(&buf, cw, header); err != nil {
 		return fmt.Errorf("writer: write header: %w", err)
 	}
 	for _, sample := range sheet.Data {
@@ -69,13 +69,7 @@ func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
 		for i, col := range header {
 			row[i] = csvSafe(fieldFor(sample, col))
 		}
-		// shortcut: a one-column sheet with an empty cell is written
-		// as a blank line, which the reader skips, so that cell (or
-		// the header) is lost on the round-trip. CSV cannot tell a
-		// blank line from a row with one empty cell; a one-column
-		// sheet is not a valid sample sheet anyway. Upgrade by writing
-		// the cell as "".
-		if err := cw.Write(row); err != nil {
+		if err := writeCSVRow(&buf, cw, row); err != nil {
 			return fmt.Errorf("writer: write row: %w", err)
 		}
 	}
@@ -87,6 +81,26 @@ func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
 		return fmt.Errorf("writer: write output: %w", err)
 	}
 	return nil
+}
+
+// writeCSVRow writes one CSV record.
+//
+// A record with a single empty cell would be written as a blank line,
+// and the reader skips blank lines: the cell would be lost on the
+// round-trip. Such a record is written as the quoted empty field
+// instead, which the reader reads back as one empty cell.
+func writeCSVRow(buf *bytes.Buffer, cw *csv.Writer, row []string) error {
+	if len(row) == 1 && row[0] == "" {
+		// The csv writer buffers its rows, so it has to be flushed
+		// before anything is written to buf directly.
+		cw.Flush()
+		if err := cw.Error(); err != nil {
+			return err
+		}
+		buf.WriteString("\"\"\n")
+		return nil
+	}
+	return cw.Write(row)
 }
 
 // WriteV2 writes sheet in v2 (IEM sectioned) format.

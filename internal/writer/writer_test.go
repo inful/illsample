@@ -580,13 +580,6 @@ func FuzzWrite(f *testing.F) {
 			t.Fatalf("Write: %v", err)
 		}
 		written := buf.String()
-		// A one-column v1 sheet has no faithful CSV form: a cell that
-		// is empty becomes a blank line, and the reader skips blank
-		// lines. Such a sheet is not a valid sample sheet, so the
-		// round-trip is not checked for it — the writer still ran.
-		if sheet.Format == model.FormatV1 && len(sheet.Header) == 1 {
-			return
-		}
 		var round *model.SampleSheet
 		if sheet.Format == model.FormatV1 {
 			round, err = parser.ParseV1(strings.NewReader(written))
@@ -600,6 +593,33 @@ func FuzzWrite(f *testing.F) {
 			t.Fatalf("row count changed: %d -> %d\nwritten:\n%q", len(sheet.Data), len(round.Data), written)
 		}
 	})
+}
+
+func TestWriteV1_OneColumnEmptyCellSurvives(t *testing.T) {
+	// A record with a single empty cell would be a blank line, which
+	// the reader skips. The writer must not lose the cell.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV1,
+		Header: []string{""},
+		Data: []model.Sample{
+			{Extra: map[string]string{"": "first"}},
+			{Extra: map[string]string{"": ""}},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV1(&buf, sheet); err != nil {
+		t.Fatalf("WriteV1: %v", err)
+	}
+	if got, want := buf.String(), "\"\"\nfirst\n\"\"\n"; got != want {
+		t.Errorf("written = %q, want %q", got, want)
+	}
+	round, err := parser.ParseV1(&buf)
+	if err != nil {
+		t.Fatalf("ParseV1: %v", err)
+	}
+	if len(round.Data) != 2 {
+		t.Errorf("len(Data) = %d, want 2", len(round.Data))
+	}
 }
 
 func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
