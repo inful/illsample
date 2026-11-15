@@ -334,12 +334,13 @@ func writeV2Manifests(buf *bytes.Buffer, manifests []model.Manifest) error {
 	cw := csv.NewWriter(buf)
 	cw.UseCRLF = false
 	for _, m := range manifests {
-		// We only write column A; the IEM spec models a single
-		// column of manifest paths. csvSafe is still applied
-		// because a manifest path that starts with =, +, -, or @
-		// would be evaluated as a formula when the file is opened
-		// in a spreadsheet.
-		if err := cw.Write([]string{csvSafe(m.A)}); err != nil {
+		// Illumina's specification writes "Key,Filename" pairs; a
+		// manifest without a key is written as its path alone.
+		row := []string{csvSafe(m.Filename)}
+		if m.Key != "" {
+			row = []string{csvSafe(m.Key), csvSafe(m.Filename)}
+		}
+		if err := cw.Write(row); err != nil {
 			return err
 		}
 	}

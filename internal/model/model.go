@@ -118,10 +118,18 @@ type Settings struct {
 	Extra        map[string]string
 }
 
-// Manifest is one row of the [Manifests] section: the path of one
-// manifest file. The section holds one path per line.
+// Manifest is one row of the [Manifests] section.
+//
+// Illumina's Sample Sheet specification writes the section as
+// "Key,Filename" pairs: the key is the label that the Data section's
+// Manifest column refers to. IEM writes one path per line under a
+// column letter, which is read as the key of the paths below it.
 type Manifest struct {
-	A string
+	// Key is the label of the manifest. It is empty when the section
+	// holds a path without a label.
+	Key string
+	// Filename is the path of the manifest file.
+	Filename string
 }
 
 // Column describes a known column in the [Data] section. The first

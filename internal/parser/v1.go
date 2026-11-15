@@ -27,6 +27,10 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 	if err != nil {
 		return nil, &ParseError{Msg: fmt.Sprintf("invalid CSV: %v", err)}
 	}
+	// The specification calls a line that holds nothing but commas
+	// and whitespace valid but ignored; such a line must not become a
+	// sample row.
+	records = dropBlankRecords(records)
 	if len(records) == 0 {
 		return nil, &ParseError{Msg: "empty input"}
 	}
@@ -66,6 +70,40 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 		sheet.Data = append(sheet.Data, v1RowToSample(row, header, colIdx, rowNum+2))
 	}
 	return sheet, nil
+}
+
+// dropBlankRecords removes the records that the specification calls
+// valid but ignored: lines that hold nothing but commas and
+// whitespace.
+func dropBlankRecords(records [][]string) [][]string {
+	out := records[:0]
+	for _, rec := range records {
+		if isBlankRecord(rec) {
+			continue
+		}
+		out = append(out, rec)
+	}
+	return out
+}
+
+// isBlankRecord reports whether a record came from a line that holds
+// nothing but commas and whitespace. A record with a single empty
+// field is kept: that is a quoted empty value, not a blank line.
+func isBlankRecord(rec []string) bool {
+	if len(rec) == 0 {
+		return true
+	}
+	if len(rec) == 1 {
+		// A single field is only a blank line when it is whitespace
+		// without a value; an empty one is a quoted empty field.
+		return rec[0] != "" && strings.TrimSpace(rec[0]) == ""
+	}
+	for _, field := range rec {
+		if strings.TrimSpace(field) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // v1RowToSample converts one CSV row into a Sample, mapping known

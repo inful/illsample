@@ -15,6 +15,11 @@ both supported by `bcl2fastq`, DRAGEN, and BaseSpace. `illsample` reads both,
 writes both, and runs a battery of validation rules so you can catch problems
 before they reach the sequencer.
 
+The layouts follow Illumina's own documentation: the *Sequencing Sample Sheet
+Format Specifications* (Pub. No. 970-2017-004-A) and the *MiSeq Sample Sheet
+Quick Reference Guide* (Part # 15028392), together with the IEM and BCL Convert
+dialects.
+
 ## Features
 
 - **Parse v1 (legacy CSV) and v2 (IEM sectioned) sample sheets** with the same
@@ -175,11 +180,15 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 ```
 
 - `[Data]` is a CSV section with the canonical column order above.
-- `[Reads]` is a vertical key/value list: key on one line, value on the next.
-- `[Settings]` is a 2-column CSV: header row, then one or more value rows.
-  A single-column section is read as a vertical list instead: key on one
-  line, value on the next.
-- `[Manifests]` (optional) is a single column of manifest paths.
+- `[Reads]` holds one cycle count per line (read 1, then read 2) in
+  Illumina's own layout, and `Key,Value` pairs or a key with the
+  value on the next line in the IEM and BCL Convert layouts.
+- `[Settings]` holds one `Key,Value` pair per line in Illumina's own
+  layout, and a table with a header row of setting names in the IEM
+  layout. A single-column section is read as a key with its value on
+  the next line.
+- `[Manifests]` (optional) holds one `Key,Filename` pair per line in
+  Illumina's own layout, and one path per line in the IEM layout.
 - Any other section is preserved verbatim in `SampleSheet.Extra` so that
   round-trips are lossless.
 
@@ -219,6 +228,8 @@ sample_01,ATCGATCG,TTAA
 | `E_V1_INVALID_INDEX`        | error   | index contains characters outside A/C/G/T/N |
 | `E_V1_INDEX_LENGTH_MISMATCH`| error   | `index` length varies between rows |
 | `E_V1_INVALID_SAMPLE_NAME`  | error   | `Sample_Name` contains characters that bcl2fastq will reject |
+| `E_V1_INVALID_SAMPLE_ID`    | error   | `Sample_ID` holds a character outside letters, digits, `-` and `_` |
+| `E_V1_LONG_SAMPLE_ID`       | error   | `Sample_ID` is longer than 100 characters |
 | `E_V2_NO_DATA`              | error   | `[Data]` section has no rows |
 | `E_V2_NO_READS`             | error   | `[Reads]` section is missing |
 | `E_V2_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
@@ -230,14 +241,18 @@ sample_01,ATCGATCG,TTAA
 | `E_V2_INDEX_LENGTH_MISMATCH`| error   | `index` length varies between rows |
 | `E_V2_INDEX_VS_READS`       | error   | `index` length does not match `[Reads]` Index1Cycles |
 | `E_V2_INVALID_SAMPLE_NAME`  | error   | `Sample_Name` contains illegal characters |
+| `E_V2_INVALID_SAMPLE_ID`    | error   | `Sample_ID` holds a character outside letters, digits, `-` and `_` |
+| `E_V2_LONG_SAMPLE_ID`       | error   | `Sample_ID` is longer than 100 characters |
 | `W_V1_INCONSISTENT_PLATE_WELL` | warning | some rows have plate/well, others don't |
 | `W_V1_LONG_SAMPLE_NAME`     | warning | `Sample_Name` is over 100 characters |
+| `W_V1_DUPLICATE_COLUMN`     | warning | a column name appears twice in the header |
 | `W_V2_MISSING_SAMPLE_NAME`  | warning | `Sample_Name` column missing (optional in the v2 spec) |
 | `W_V2_MISSING_SAMPLE_PROJECT` | warning | `Sample_Project` column missing (optional in the v2 spec) |
 | `W_V2_NO_ADAPTER`           | warning | no `Adapter`/`AdapterRead1` sequence in the settings |
 | `W_V2_INCONSISTENT_PLATE_WELL` | warning | some rows have plate/well, others don't |
 | `W_V2_INCONSISTENT_INDEX_IDS` | warning | `I7_Index_ID` / `I5_Index_ID` only on some rows |
 | `W_V2_LONG_SAMPLE_NAME`     | warning | `Sample_Name` is over 100 characters |
+| `W_V2_DUPLICATE_COLUMN`     | warning | a column name appears twice in the header |
 
 `Sample_Name` and `Sample_Project` are required in v1 but optional in v2:
 Illumina's v2 spec lists only `Sample_ID` and `index` as required data
@@ -279,8 +294,16 @@ send it, not just what the spec says:
   in v2 sheets.
 - **Empty `[Settings]`** and empty `[Manifests]` sections are treated
   as "no settings / no manifests" rather than as errors.
+- **A line that holds nothing but commas and whitespace** is ignored,
+  as the specification asks; it does not become a sample row.
+- **A section label may be padded with commas** (`[Header],,,,,,`), and
+  so may the records below it (`RunName,MyRun,,,`).
+- **The instruction lines of Illumina's v2 template** (the ones in
+  angle brackets) are skipped, so the template parses as it is.
 - **Column names** are case-insensitive, and surrounding whitespace is
-  trimmed, so `" Notes"` and `Notes` are the same column.
+  trimmed, so `" Notes"` and `Notes` are the same column. The
+  identifier column may be spelled `Sample_ID` or `SampleID`, as
+  Illumina's and MiSeq's documents spell it.
 - **Unknown sections** are preserved verbatim in `sheet.Extra`, so a
   v2 sheet that contains DRAGEN-specific sections round-trips
   losslessly.

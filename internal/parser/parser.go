@@ -196,7 +196,7 @@ func stripBlankLines(lines []string) []string {
 func isV2(lines []string) bool {
 	for _, line := range lines {
 		t := strings.TrimSpace(line)
-		if t == "" || comment(t) {
+		if isBlankLine(t) || comment(t) || isInstructionLine(t) {
 			continue
 		}
 		if isSectionHeader(t) {
@@ -207,9 +207,7 @@ func isV2(lines []string) bool {
 		}
 	}
 	return false
-}
-
-// preambleLine reports whether a line can be skipped as part of a
+} // preambleLine reports whether a line can be skipped as part of a
 // text preamble that precedes the first [Section] header.
 //
 // Preamble lines are free text — a note about the run, an instruction
@@ -238,15 +236,36 @@ func preambleLine(s string) bool {
 }
 
 // isSectionHeader reports whether s looks like a [Name] section header.
+// The specification allows a section label to be padded with commas
+// ("[Header],,,,,,"), so the commas are stripped before the check.
 func isSectionHeader(s string) bool {
+	s = strings.TrimRight(s, ",")
 	return strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") && len(s) >= 2
 }
 
 // sectionName extracts the section name from a [Name] header.
 func sectionName(s string) string {
+	s = strings.TrimRight(s, ",")
 	s = strings.TrimPrefix(s, "[")
 	s = strings.TrimSuffix(s, "]")
 	return s
+}
+
+// isBlankLine reports whether a line holds nothing but commas and
+// whitespace. The specification calls such lines valid but ignored,
+// so they must not become a sample row.
+func isBlankLine(s string) bool {
+	return strings.Trim(s, ", \t\r\n") == ""
+}
+
+// isInstructionLine reports whether a line is one of the instruction
+// lines that Illumina's v2 template puts between its sections, for
+// example "<Enter analysis settings for demultiplexing...>". The
+// template says to delete them before uploading a sheet, but a sheet
+// that still holds them must parse.
+func isInstructionLine(s string) bool {
+	s = strings.TrimRight(strings.TrimSpace(s), ",")
+	return len(s) >= 2 && strings.HasPrefix(s, "<") && strings.HasSuffix(s, ">")
 }
 
 // csvRecord is one parsed CSV row. It exists to keep call sites concise.
@@ -343,7 +362,7 @@ func (p *lineParser) eof() bool {
 func (p *lineParser) skipBlankAndComments() {
 	for p.pos < len(p.lines) {
 		t := strings.TrimSpace(p.lines[p.pos])
-		if t == "" || comment(t) {
+		if isBlankLine(t) || comment(t) {
 			p.pos++
 			continue
 		}

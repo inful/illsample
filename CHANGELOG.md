@@ -9,11 +9,43 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - `illsample validate -f v1|v2` forces the input format instead of
   auto-detecting it.
+- `E_V1_INVALID_SAMPLE_ID`, `E_V2_INVALID_SAMPLE_ID`,
+  `E_V1_LONG_SAMPLE_ID` and `E_V2_LONG_SAMPLE_ID`: the specification
+  allows only letters, digits, dashes and underscores in a
+  `Sample_ID`, and at most 100 characters.
+- `W_V1_DUPLICATE_COLUMN` and `W_V2_DUPLICATE_COLUMN`: the section
+  requirements say that the column headers of a data section must all
+  be unique.
 - A fuzz target for the writer (`go test -fuzz=FuzzWrite
   ./internal/writer/`): the writer must not fail, and what it writes
   must parse back to the same number of rows.
 
 ### Fixed
+- The parser now reads the layouts that Illumina documents, in the
+  *Sequencing Sample Sheet Format Specifications* (Pub. No.
+  970-2017-004-A) and the *MiSeq Sample Sheet Quick Reference Guide*
+  (Part # 15028392):
+  - `[Reads]` holds one cycle count per line (read 1, then read 2).
+    Such a sheet failed to parse with `unknown [Reads] key "151"`.
+  - `[Settings]` holds one `Key,Value` pair per line. Such a sheet
+    was read as a table, so the Read 1 adapter came out as the
+    literal text `AdapterRead2` and the adapter sequence was lost.
+  - `[Manifests]` holds one `Key,Filename` pair per line. The key and
+    the file name are now read apart.
+  - A section label may be padded with commas (`[Header],,,,,,`).
+    Such a label was not recognised, and the sheet was read as v1.
+  - A line that holds nothing but commas and whitespace is ignored,
+    as the specification asks. It used to become an extra sample row
+    with an empty `Sample_ID`.
+  - The trailing commas that pad a record are ignored. The v2
+    template's `Read1Cycles,125,,` used to fail with "value for
+    \"Read1Cycles\" must be an integer, got \"125,,\"".
+  - The instruction lines that Illumina's v2 template puts between
+    its sections (the ones in angle brackets) are skipped, so the
+    template and the NovaSeq 6000 example sheet parse as they are.
+- The verifier accepts every spelling of a column that the parser
+  accepts: a sheet that writes `SampleID`, as the MiSeq guide does, no
+  longer fails with `E_V2_MISSING_SAMPLE_ID`.
 - A v1 sheet with a single column no longer loses a cell on the
   round-trip: a cell that is empty was written as a blank line, and
   the reader skips blank lines. Such a cell is written as the quoted
@@ -55,6 +87,8 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 - `Manifest.B` … `Manifest.F`: the fields were never read from a
   sheet nor written to one, so a value put there was silently dropped.
+- `Manifest.A` is now `Manifest.Filename`, and `Manifest.Key` holds
+  the label that the Data section's `Manifest` column refers to.
 - `01-REVIEW.md`: the review of the initial release. Every finding in
   it is fixed and listed in this changelog, so the file only dated the
   repo. It stays in the history, at

@@ -189,11 +189,11 @@ func TestParseV2_DualIndex(t *testing.T) {
 	if len(sheet.Manifests) != 2 {
 		t.Errorf("len(Manifests) = %d, want 2", len(sheet.Manifests))
 	}
-	if sheet.Manifests[0].A != "/path/to/manifest_one.csv" {
-		t.Errorf("Manifests[0] = %q, want /path/to/manifest_one.csv", sheet.Manifests[0].A)
+	if sheet.Manifests[0].Filename != "/path/to/manifest_one.csv" {
+		t.Errorf("Manifests[0].Filename = %q, want /path/to/manifest_one.csv", sheet.Manifests[0].Filename)
 	}
-	if sheet.Manifests[1].A != "/path/to/manifest_two.csv" {
-		t.Errorf("Manifests[1] = %q, want /path/to/manifest_two.csv", sheet.Manifests[1].A)
+	if sheet.Manifests[1].Filename != "/path/to/manifest_two.csv" {
+		t.Errorf("Manifests[1].Filename = %q, want /path/to/manifest_two.csv", sheet.Manifests[1].Filename)
 	}
 }
 
@@ -224,8 +224,8 @@ func TestParseV2_ManifestsSingleAIsKept(t *testing.T) {
 	if len(sheet.Manifests) != 1 {
 		t.Errorf("len(Manifests) = %d, want 1", len(sheet.Manifests))
 	}
-	if len(sheet.Manifests) == 1 && sheet.Manifests[0].A != "A" {
-		t.Errorf("Manifests[0].A = %q, want A", sheet.Manifests[0].A)
+	if len(sheet.Manifests) == 1 && sheet.Manifests[0].Key != "A" {
+		t.Errorf("Manifests[0].Key = %q, want A", sheet.Manifests[0].Key)
 	}
 }
 
@@ -244,8 +244,8 @@ func TestParseV2_ManifestsAHeaderSkippedWhenFollowed(t *testing.T) {
 	if len(sheet.Manifests) != 1 {
 		t.Fatalf("len(Manifests) = %d, want 1", len(sheet.Manifests))
 	}
-	if sheet.Manifests[0].A != "/path/to/manifest.csv" {
-		t.Errorf("Manifests[0].A = %q, want /path/to/manifest.csv", sheet.Manifests[0].A)
+	if sheet.Manifests[0].Filename != "/path/to/manifest.csv" {
+		t.Errorf("Manifests[0].Filename = %q, want /path/to/manifest.csv", sheet.Manifests[0].Filename)
 	}
 }
 
