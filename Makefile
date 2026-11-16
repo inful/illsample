@@ -42,6 +42,7 @@ cover-html:
 
 fuzz:
 	$(GO) test -fuzz=FuzzParse -fuzztime=10s ./internal/parser/
+	$(GO) test -fuzz=FuzzWrite -fuzztime=10s ./internal/writer/
 
 vet:
 	$(GO) vet ./...
