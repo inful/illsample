@@ -3,7 +3,7 @@
 [![CI](https://github.com/inful/illsample/actions/workflows/ci.yml/badge.svg)](https://github.com/inful/illsample/actions/workflows/ci.yml)
 [![Release](https://github.com/inful/illsample/actions/workflows/release.yml/badge.svg)](https://github.com/inful/illsample/actions/workflows/release.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/inful/illsample.svg)](https://pkg.go.dev/github.com/inful/illsample)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE)
 
 A Go library and CLI for parsing, writing, and verifying Illumina sample sheets.
 
@@ -40,7 +40,7 @@ dialects.
 ### From source
 
 ```bash
-go install github.com/inful/illsample/cmd/illsample@v0.2.0
+go install github.com/inful/illsample/cmd/illsample@v0.3.0
 ```
 
 ### From a release
@@ -53,9 +53,9 @@ Windows). Grab the archive for your platform, extract it, and put the
 binary on your `PATH`.
 
 ```bash
-# Example: Linux amd64, release v0.2.0
+# Example: Linux amd64, release v0.3.0
 curl -L -o illsample.tar.gz \
-  https://github.com/inful/illsample/releases/download/v0.2.0/illsample_0.2.0_linux_amd64.tar.gz
+  https://github.com/inful/illsample/releases/download/v0.3.0/illsample_0.3.0_linux_amd64.tar.gz
 tar -xzf illsample.tar.gz
 sudo mv illsample /usr/local/bin/
 ```
@@ -328,4 +328,4 @@ go tool cover -html=coverage.out
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GNU General Public License v3.0 or later. See [LICENSE](LICENSE).

@@ -4,7 +4,7 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-11-16
 
 ### Added
 - `illsample validate -f v1|v2` forces the input format instead of
@@ -83,6 +83,16 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - `E_V2_INDEX_VS_READS` names the `[Reads]` key it compares against.
 - `illsample validate -strict` no longer prints a promoted warning
   twice, and counts it once.
+
+### Changed
+- The project is licensed under the **GNU General Public License
+  version 3 or later**, not MIT. The `LICENSE` file holds the full
+  text.
+- The sample sheets that Illumina publishes are now part of the test
+  suite (`testdata/illumina/`): the v2 template, the NovaSeq 6000
+  example sheet and the six 5-base DNA prep templates. Every one of
+  them is parsed, verified and written back, and the round-trip must
+  not change a sample.
 
 ### Removed
 - `Manifest.B` … `Manifest.F`: the fields were never read from a
@@ -201,6 +211,7 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - 100% statement coverage on the top-level package; 77% / 91% / 80%
   on the internal packages (parser / verify / writer).
 
-[Unreleased]: https://github.com/inful/illsample/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/inful/illsample/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/inful/illsample/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/inful/illsample/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/inful/illsample/releases/tag/v0.1.0
