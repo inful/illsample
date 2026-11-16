@@ -263,6 +263,11 @@ func isBlankLine(s string) bool {
 // example "<Enter analysis settings for demultiplexing...>". The
 // template says to delete them before uploading a sheet, but a sheet
 // that still holds them must parse.
+//
+// shortcut: a line that is nothing but a bracketed word is read as an
+// instruction. A data row whose only cell is "<control>" would be
+// skipped; upgrade by only skipping the lines that start with "<"
+// and are longer than a word.
 func isInstructionLine(s string) bool {
 	s = strings.TrimRight(strings.TrimSpace(s), ",")
 	return len(s) >= 2 && strings.HasPrefix(s, "<") && strings.HasSuffix(s, ">")

@@ -326,6 +326,12 @@ func applySetting(s *model.Settings, key, value string) {
 // The two layouts look alike when the table has two columns: in the
 // pair layout the second field of the first record is a value, in the
 // table layout it is the name of the next setting.
+//
+// shortcut: the two layouts are told apart by the shape of the names,
+// so a section whose value looks like a name is read as a table.
+// Illumina's values are sequences, numbers and flags, so this needs a
+// hand-edited sheet to hit; upgrade by asking the writer which
+// layout it used.
 func isPairSettings(records []csvRecord) bool {
 	if len(records) == 0 || len(records[0]) != 2 {
 		return false
@@ -342,6 +348,10 @@ func isPairSettings(records []csvRecord) bool {
 // setting rather than its value. Illumina's setting names are words
 // ("Adapter", "outputgenomevcf"); its values are sequences, numbers
 // or flags.
+//
+// shortcut: a lower-case word is read as a name. Illumina's values
+// are sequences, numbers and flags, so this needs a hand-edited sheet
+// to hit; upgrade by asking the writer which layout it used.
 func isSettingName(s string) bool {
 	if s == "" {
 		return false
