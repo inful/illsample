@@ -104,16 +104,22 @@ func writeCSVRow(buf *bytes.Buffer, cw *csv.Writer, row []string) error {
 }
 
 // WriteV2 writes sheet in v2 (IEM sectioned) format.
+//
+// The specification says that a sample sheet must begin with the
+// Header section and end with the Data section; the sections in
+// between may be in any order. The writer follows that order, so its
+// output is the layout Illumina's own template uses.
 func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 	var buf bytes.Buffer
 
-	// [Data]
-	if err := writeSectionHeader(&buf, "Data"); err != nil {
-		return err
-	}
-	header := v2DataHeader(sheet)
-	if err := writeV2Data(&buf, header, sheet.Data); err != nil {
-		return err
+	// [Header] comes first, if the sheet has one.
+	if sec, ok := sheet.Extra["Header"]; ok {
+		if err := writeSectionHeader(&buf, sec.Name); err != nil {
+			return err
+		}
+		if err := writeV2GenericSection(&buf, sec); err != nil {
+			return err
+		}
 	}
 
 	// [Reads]
@@ -150,6 +156,9 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 	if len(sheet.Extra) > 0 {
 		names := make([]string, 0, len(sheet.Extra))
 		for name := range sheet.Extra {
+			if name == "Header" {
+				continue // already written
+			}
 			names = append(names, name)
 		}
 		sort.Strings(names)
@@ -162,6 +171,15 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 				return err
 			}
 		}
+	}
+
+	// [Data] comes last.
+	if err := writeSectionHeader(&buf, "Data"); err != nil {
+		return err
+	}
+	header := v2DataHeader(sheet)
+	if err := writeV2Data(&buf, header, sheet.Data); err != nil {
+		return err
 	}
 
 	if _, err := io.WriteString(w, buf.String()); err != nil {

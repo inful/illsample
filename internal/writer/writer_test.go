@@ -95,6 +95,15 @@ func TestWriteV1_RoundTripExtraColumns(t *testing.T) {
 	}
 }
 
+// sameSample compares two samples, ignoring SourceRow: it is the
+// position of the row in the file it was read from, and the writer
+// puts the data section last, so the position changes.
+func sameSample(a, b model.Sample) bool {
+	a.SourceRow = 0
+	b.SourceRow = 0
+	return reflect.DeepEqual(a, b)
+}
+
 func TestWriteV2_RoundTrip(t *testing.T) {
 	for _, fixture := range []string{"v2_single_index.csv", "v2_dual_index.csv", "v2_empty_manifests.csv"} {
 		t.Run(fixture, func(t *testing.T) {
@@ -118,7 +127,7 @@ func TestWriteV2_RoundTrip(t *testing.T) {
 				t.Fatalf("len(Data) = %d, want %d", len(round.Data), len(sheet.Data))
 			}
 			for i := range sheet.Data {
-				if !reflect.DeepEqual(sheet.Data[i], round.Data[i]) {
+				if !sameSample(sheet.Data[i], round.Data[i]) {
 					t.Errorf("Data[%d] = %+v, want %+v", i, round.Data[i], sheet.Data[i])
 				}
 			}
@@ -290,6 +299,13 @@ func TestWriteV2_OutputStructure(t *testing.T) {
 		Settings: &model.Settings{
 			Adapter: "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
 		},
+		Extra: map[string]model.Section{
+			"Header": {
+				Name:    "Header",
+				Columns: []string{"FileFormatVersion", "2"},
+				Rows:    [][]string{{"FileFormatVersion", "2"}},
+			},
+		},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
 		},
@@ -299,16 +315,62 @@ func TestWriteV2_OutputStructure(t *testing.T) {
 		t.Fatalf("WriteV2: %v", err)
 	}
 	out := buf.String()
-	// [Data] must come before [Reads] which must come before [Settings].
-	dataIdx := strings.Index(out, "[Data]")
+	// The specification says a sample sheet must begin with the Header
+	// section and end with the Data section.
+	headerIdx := strings.Index(out, "[Header]")
 	readsIdx := strings.Index(out, "[Reads]")
 	settingsIdx := strings.Index(out, "[Settings]")
-	if dataIdx < 0 || readsIdx < 0 || settingsIdx < 0 {
+	dataIdx := strings.Index(out, "[Data]")
+	if headerIdx < 0 || readsIdx < 0 || settingsIdx < 0 || dataIdx < 0 {
 		t.Fatalf("output missing section headers:\n%s", out)
 	}
-	if dataIdx >= readsIdx || readsIdx >= settingsIdx {
-		t.Errorf("section order: data=%d reads=%d settings=%d (want data < reads < settings)\n%s",
-			dataIdx, readsIdx, settingsIdx, out)
+	if headerIdx > readsIdx || readsIdx > settingsIdx || settingsIdx > dataIdx {
+		t.Errorf("section order: header=%d reads=%d settings=%d data=%d (want header < reads < settings < data)\n%s",
+			headerIdx, readsIdx, settingsIdx, dataIdx, out)
+	}
+}
+
+func TestWriteV2_HeaderSectionRoundTrip(t *testing.T) {
+	// A sheet with a [Header] section must keep it, and the written
+	// sheet must begin with it and end with the data section.
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Reads:  &model.Reads{Read1Cycles: 151},
+		Extra: map[string]model.Section{
+			"Header": {
+				Name:    "Header",
+				Columns: []string{"FileFormatVersion", "2"},
+				Rows:    [][]string{{"FileFormatVersion", "2"}},
+			},
+		},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	if !strings.HasPrefix(out, "[Header]\n") {
+		t.Errorf("output does not start with the Header section:\n%s", out)
+	}
+	if !strings.Contains(out, "\n[Data]\n") {
+		t.Errorf("output has no Data section:\n%s", out)
+	}
+	if strings.Index(out, "[Data]") < strings.Index(out, "[Header]") {
+		t.Errorf("the Data section must come last:\n%s", out)
+	}
+	round, err := parser.Parse(&buf)
+	if err != nil {
+		t.Fatalf("Parse round-trip: %v", err)
+	}
+	sec, ok := round.Extra["Header"]
+	if !ok {
+		t.Fatalf("Extra[Header] lost, got %v", round.Extra)
+	}
+	if len(sec.Rows) != 1 || sec.Rows[0][0] != "FileFormatVersion" {
+		t.Errorf("Extra[Header].Rows = %v, want the FileFormatVersion row", sec.Rows)
 	}
 }
 

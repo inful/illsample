@@ -32,8 +32,9 @@ dialects.
   Use `VerifyOptions` to suppress warnings or promote them to errors.
 - **CLI** with `validate`, `convert`, and `info` subcommands for shell pipelines.
 - **Zero external dependencies.** Pure standard library.
-- **Fuzzed.** The parser is exercised by `go test -fuzz` to guard against
-  panics on malformed input.
+- **Fuzzed.** The parser and the writer are exercised by `go test -fuzz`
+  to guard against panics on malformed input and against a write that
+  loses a sample.
 
 ## Installation
 
@@ -162,10 +163,6 @@ Illumina Experiment Manager (IEM) emits this layout; `bcl2fastq` and
 DRAGEN both accept it. The canonical v2 layout is:
 
 ```ini
-[Data]
-Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
-sample_01,sample_one,plate1,A1,UDI001,ATCGATCG,,,RNAseq,first
-
 [Reads]
 Read1Cycles
 151
@@ -177,7 +174,15 @@ Index1Cycles
 [Settings]
 Adapter,AdapterRead2
 AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+
+[Data]
+Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+sample_01,sample_one,plate1,A1,UDI001,ATCGATCG,,,RNAseq,first
 ```
+
+The specification says that a sample sheet must begin with the
+`[Header]` section and end with the `[Data]` section; the writer emits
+them in that order.
 
 - `[Data]` is a CSV section with the canonical column order above.
 - `[Reads]` holds one cycle count per line (read 1, then read 2) in
@@ -320,6 +325,7 @@ go test -race ./...
 
 # Run a quick fuzz pass.
 go test -fuzz=FuzzParse -fuzztime=10s ./internal/parser/
+go test -fuzz=FuzzWrite -fuzztime=10s ./internal/writer/
 
 # Check coverage.
 go test -coverprofile=coverage.out ./...
