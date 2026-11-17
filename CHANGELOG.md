@@ -4,7 +4,7 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.2] - 2026-11-17
 
 ### Fixed
 - A setting that is both a typed field and an `Extra` key is written
@@ -284,7 +284,8 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - 100% statement coverage on the top-level package; 77% / 91% / 80%
   on the internal packages (parser / verify / writer).
 
-[Unreleased]: https://github.com/inful/illsample/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/inful/illsample/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/inful/illsample/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/inful/illsample/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/inful/illsample/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/inful/illsample/compare/v0.3.0...v0.4.0
