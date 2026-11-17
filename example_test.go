@@ -61,6 +61,8 @@ func ExampleWrite() {
 	}
 	fmt.Print(buf.String())
 	// Output:
+	// [Header]
+	// FileFormatVersion,2
 	// [Data]
 	// Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
 	// id1,name1,,,,ATCG,,,P1,

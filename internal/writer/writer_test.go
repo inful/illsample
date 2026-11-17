@@ -803,3 +803,32 @@ func TestWriteV2_SettingsColumnNotDuplicated(t *testing.T) {
 		t.Errorf("round-trip settings = %+v, want the Adapter AGATCG", round.Settings)
 	}
 }
+
+// TestWriteV2_HeaderSectionIsAlwaysWritten checks that a v2 sheet
+// gets the [Header] section even when it records none: the
+// specification says a v2 sample sheet must begin with it, so a sheet
+// the library writes must be one the library accepts.
+func TestWriteV2_HeaderSectionIsAlwaysWritten(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Data:   []model.Sample{{SampleID: "id1", Index: "ATCGATCG"}},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	if !strings.HasPrefix(out, "[Header]\n") {
+		t.Errorf("output does not start with the Header section:\n%s", out)
+	}
+	if !strings.Contains(out, "FileFormatVersion,2") {
+		t.Errorf("output has no file format version:\n%s", out)
+	}
+	round, err := parser.Parse(strings.NewReader(out))
+	if err != nil {
+		t.Fatalf("Parse round-trip: %v\noutput:\n%s", err, out)
+	}
+	if got := round.Header["FileFormatVersion"]; got != "2" {
+		t.Errorf("Header[FileFormatVersion] = %q, want 2", got)
+	}
+}

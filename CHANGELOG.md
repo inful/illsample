@@ -4,6 +4,24 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- `E_V2_NO_READS` is now `W_V2_NO_READS`, a warning rather than an
+  error. Illumina's sequencing specification says that "depending on
+  the software using the Sample Sheet file, some sections may be
+  optional. However, the Header and Data sections are always
+  required." The `[Reads]` section holds the cycle counts, which some
+  software takes from the run instead of from the sheet.
+
+### Fixed
+- The v2 writer writes the `[Header]` section for every sheet. A sheet
+  that records no run metadata got no section at all, and the
+  specification says a v2 sample sheet must begin with it — so
+  `illsample convert -f v2` wrote a sheet that `illsample validate`
+  rejected with `E_V2_NO_HEADER`. The section now holds the file
+  format version when the sheet has no records of its own.
+
 ## [0.5.2] - 2026-11-17
 
 ### Fixed
