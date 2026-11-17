@@ -26,12 +26,21 @@ import (
 )
 
 // canonicalColumnsV2 is the column order used by the IEM v2 [Data] section.
-// It is derived from the model registry so the v1 default header and the
-// v2 canonical header cannot drift apart. See also defaultHeaderV1.
+// It is derived from the model registry so the v2 canonical header cannot
+// drift apart from the columns the model knows.
 var canonicalColumnsV2 = model.CanonicalColumnNames()
 
-// defaultHeaderV1 is used when a v1 sheet has no recorded header.
-var defaultHeaderV1 = model.CanonicalColumnNames()
+// defaultHeaderV1 is the header a v1 sheet gets when it records none.
+// It is Illumina's own bcl2fastq template: the columns the legacy
+// layout has, and not the IEM ones (Sample_Plate, Sample_Well,
+// I7_Index_ID, I5_Index_ID), which are v2 columns.
+//
+// A test checks that every name here is a column the model knows, so
+// that a rename in the registry cannot leave the writer writing a
+// column the parser does not read.
+var defaultHeaderV1 = []string{
+	"Sample_ID", "Sample_Name", "index", "index2", "Sample_Project", "Description",
+}
 
 // Write serialises sheet to w. The output format is chosen from
 // sheet.Format. FormatUnknown is treated as v2.

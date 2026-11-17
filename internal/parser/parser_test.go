@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -944,4 +945,24 @@ func FuzzParse(f *testing.F) {
 			t.Errorf("unknown format %v", sheet.Format)
 		}
 	})
+}
+
+// TestParse_NilReader checks that the entry points report a nil
+// reader as an error instead of panicking. Write reports a nil sheet
+// and Verify reports E_NIL_SHEET, so Parse should not be the one
+// that crashes.
+func TestParse_NilReader(t *testing.T) {
+	for name, fn := range map[string]func(io.Reader) (*model.SampleSheet, error){
+		"Parse":   Parse,
+		"ParseV1": ParseV1,
+		"ParseV2": ParseV2,
+	} {
+		sheet, err := fn(nil)
+		if err == nil {
+			t.Errorf("%s(nil) = %v, want an error", name, sheet)
+		}
+		if sheet != nil {
+			t.Errorf("%s(nil) returned a sheet %v, want nil", name, sheet)
+		}
+	}
 }

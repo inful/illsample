@@ -4,6 +4,23 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- `Parse`, `ParseV1` and `ParseV2` report a nil reader as an error
+  instead of panicking. `Write` already reported a nil sheet and
+  `Verify` already reported `E_NIL_SHEET`; the parser was the one
+  that crashed.
+- A v1 sheet that records no columns gets a v1 header. The default
+  was the v2 canonical column list, so a sheet built in code came
+  out with the IEM columns `Sample_Plate`, `Sample_Well`,
+  `I7_Index_ID` and `I5_Index_ID`, which the legacy layout does not
+  have. The default is now Illumina's own `bcl2fastq` template:
+  `Sample_ID,Sample_Name,index,index2,Sample_Project,Description`.
+- `illsample new -f v1` and the writer now use that one definition
+  of the v1 header; the command had a list of its own that did not
+  match.
+
 ## [0.5.0] - 2026-11-17
 
 ### Added

@@ -44,6 +44,9 @@ var maxInputSize = 2 * 1024 * 1024
 // is larger than maxInputSize, it returns a *ParseError rather than
 // allocating a buffer for it.
 func readLimited(r io.Reader) ([]byte, error) {
+	if r == nil {
+		return nil, &ParseError{Msg: "nil reader"}
+	}
 	data, err := io.ReadAll(io.LimitReader(r, int64(maxInputSize)+1))
 	if err != nil {
 		return nil, fmt.Errorf("read sample sheet: %w", err)
