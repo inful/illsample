@@ -123,6 +123,7 @@ func ExampleSampleSheet() {
 func ExampleVerifyWithOptions() {
 	sheet := &illsample.SampleSheet{
 		Format:  illsample.FormatV2,
+		Header:  map[string]string{"FileFormatVersion": "2"},
 		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
 		Reads:   &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		// No Settings -> W_V2_NO_ADAPTER warning.

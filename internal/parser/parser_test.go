@@ -11,10 +11,12 @@ import (
 	"github.com/inful/illsample/internal/model"
 )
 
-// fixtureDir is the directory that contains the parser's test data.
-const fixtureDir = "testdata"
+// fixtureDir is the directory that contains the test data. It is the
+// module's testdata directory, so that every package reads the same
+// fixtures rather than a copy of them.
+const fixtureDir = "../../testdata"
 
-// readFile reads a file under the package's testdata directory.
+// readFile reads a file under the fixture directory.
 func readFile(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(fixtureDir, name))

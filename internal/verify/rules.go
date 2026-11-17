@@ -73,7 +73,8 @@ func issueCode(sev Severity, format model.Format, suffix string) string {
 var allRules = []rule{
 	// Structural: presence of required sections / columns.
 	requireData,
-	requireReadsSection, // v2 only
+	requireHeaderSection, // v2 only
+	requireReadsSection,  // v2 only
 	requireSampleIDColumn,
 	requireSampleNameColumnV1,
 	requireSampleNameColumnV2,
@@ -493,6 +494,31 @@ var indexMatchesReads = rule{
 		}
 		checkColumn(func(s model.Sample) string { return s.Index }, s.Reads.Index1Cycles, "index", "Index1Cycles")
 		checkColumn(func(s model.Sample) string { return s.Index2 }, s.Reads.Index2Cycles, "index2", "Index2Cycles")
+	},
+}
+
+// requireHeaderSection checks the [Header] section. Illumina's
+// specification says that a sample sheet must begin with the Header
+// section and end with the Data section, and that the Header and
+// Reads sections are present in every v2 sample sheet. A sheet
+// without one is broken in the same way a sheet without [Reads] is,
+// so it is an error and not a warning.
+var requireHeaderSection = rule{
+	suffix:   "NO_HEADER",
+	severity: SeverityError,
+	formats:  []model.Format{model.FormatV2},
+	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
+		if len(s.Header) > 0 {
+			return
+		}
+		// A sheet that carries the section as an unknown section has
+		// one too.
+		if _, ok := s.Extra["Header"]; ok {
+			return
+		}
+		r.add(sev, code,
+			"[Header] section is missing; a v2 sample sheet must begin with it",
+			Location{Section: "Header", Row: -1})
 	},
 }
 
