@@ -11,10 +11,6 @@ the project adheres to [Semantic Versioning](https://semver.org/).
   instead of panicking. `Write` already reported a nil sheet and
   `Verify` already reported `E_NIL_SHEET`; the parser was the one
   that crashed.
-
-## [Unreleased - writer]
-
-### Fixed
 - A v1 sheet that records no columns gets a v1 header. The default
   was the v2 canonical column list, so a sheet built in code came
   out with the IEM columns `Sample_Plate`, `Sample_Well`,

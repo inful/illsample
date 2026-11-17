@@ -734,3 +734,37 @@ func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
 		t.Errorf("output should contain custom-value row:\n%s", out)
 	}
 }
+
+// TestWriteV1_DefaultHeader checks that a v1 sheet that records no
+// columns gets a v1 header, not the v2 one: the IEM columns
+// (Sample_Plate, Sample_Well, I7_Index_ID, I5_Index_ID) are not v1
+// columns.
+func TestWriteV1_DefaultHeader(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format: model.FormatV1,
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := WriteV1(&buf, sheet); err != nil {
+		t.Fatalf("WriteV1: %v", err)
+	}
+	header, _, _ := strings.Cut(buf.String(), "\n")
+	want := "Sample_ID,Sample_Name,index,index2,Sample_Project,Description"
+	if header != want {
+		t.Errorf("header = %q, want %q", header, want)
+	}
+}
+
+// TestDefaultHeaderV1_KnownColumns checks that every column of the
+// v1 default header is one the model knows, so that a rename in the
+// registry cannot leave the writer writing a column the parser does
+// not read.
+func TestDefaultHeaderV1_KnownColumns(t *testing.T) {
+	for _, name := range defaultHeaderV1 {
+		if model.ColumnByName(name) == nil {
+			t.Errorf("defaultHeaderV1 has %q, which the model does not know", name)
+		}
+	}
+}

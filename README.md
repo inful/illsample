@@ -212,6 +212,9 @@ matched by name. Required columns for `bcl2fastq`:
 - `index` (and optionally `index2` for dual-indexed runs)
 - `Sample_Project` (or `SampleProject`)
 
+A sheet that records no columns gets Illumina's own `bcl2fastq`
+template as its header: `Sample_ID,Sample_Name,index,index2,Sample_Project,Description`.
+
 A minimal v1 sheet:
 
 ```csv

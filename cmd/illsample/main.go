@@ -286,10 +286,12 @@ func newTemplateV2() *illsample.SampleSheet {
 
 // newTemplateV1 returns a v1 sample sheet to fill in: the columns
 // bcl2fastq reads, and one example sample.
+//
+// The sheet records no columns, so the writer gives it the v1 default
+// header: the template and the writer agree on one definition.
 func newTemplateV1() *illsample.SampleSheet {
 	return &illsample.SampleSheet{
-		Format:  illsample.FormatV1,
-		Columns: []string{"Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"},
+		Format: illsample.FormatV1,
 		Data: []illsample.Sample{
 			{
 				SampleID:      "sample_01",
