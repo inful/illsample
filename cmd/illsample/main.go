@@ -320,6 +320,17 @@ func runInfo(args []string) int {
 	}
 	fmt.Printf("Format:        %s\n", sheet.Format)
 	fmt.Printf("Rows:          %d\n", len(sheet.Data))
+	// The [Header] section holds the run metadata; it is the first
+	// thing a user wants to know about a sheet. The labels are as
+	// wide as the longest of them, so the values line up.
+	names := headerNames(sheet.Header)
+	width := 0
+	for _, k := range names {
+		width = max(width, len(k)+1)
+	}
+	for _, k := range names {
+		fmt.Printf("%-*s %s\n", width, k+":", sheet.Header[k])
+	}
 	if sheet.Reads != nil {
 		fmt.Printf("Read1Cycles:   %d\n", sheet.Reads.Read1Cycles)
 		fmt.Printf("Read2Cycles:   %d\n", sheet.Reads.Read2Cycles)
@@ -352,6 +363,19 @@ func runInfo(args []string) int {
 		}
 	}
 	return 0
+}
+
+// headerNames returns the names of the [Header] records, sorted
+// alphabetically. Sorting gives stable output across runs, which
+// matters when the user is comparing two invocations of `illsample
+// info` or copy/pasting into a bug report.
+func headerNames(header map[string]string) []string {
+	names := make([]string, 0, len(header))
+	for name := range header {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // extraNames returns the names of unknown sections, sorted

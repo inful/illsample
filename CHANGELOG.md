@@ -4,6 +4,18 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- A setting that is both a typed field and an `Extra` key is written
+  once. The v2 writer wrote the `Adapter` column twice when
+  `Settings.Adapter` and `Settings.Extra["Adapter"]` were both set,
+  and the specification says the column headers of a section must all
+  be unique.
+- `illsample info` prints the run metadata of the `[Header]` section.
+  The section is a typed field now, so its records had become
+  invisible in the summary.
+
 ## [0.5.1] - 2026-11-17
 
 ### Fixed

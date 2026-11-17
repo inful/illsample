@@ -176,6 +176,11 @@ func TestCLI_Info(t *testing.T) {
 	if !strings.Contains(stdout, "Format:") || !strings.Contains(stdout, "v2") {
 		t.Errorf("stdout should contain format info, got %q", stdout)
 	}
+	// The run metadata of the [Header] section must be in the
+	// summary: it is what a user asks for first.
+	if !strings.Contains(stdout, "RunName") {
+		t.Errorf("stdout should contain the run metadata, got %q", stdout)
+	}
 }
 
 func TestCLI_Convert(t *testing.T) {

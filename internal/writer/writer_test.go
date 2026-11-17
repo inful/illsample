@@ -768,3 +768,38 @@ func TestDefaultHeaderV1_KnownColumns(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteV2_SettingsColumnNotDuplicated checks that a setting that
+// is both a typed field and an Extra key is written once. The
+// specification says the column headers of a section must all be
+// unique.
+func TestWriteV2_SettingsColumnNotDuplicated(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: map[string]string{"FileFormatVersion": "2"},
+		Settings: &model.Settings{
+			Adapter: "AGATCG",
+			Extra:   map[string]string{"Adapter": "AGATCG", "SoftwareVersion": "1.2"},
+		},
+		Data: []model.Sample{{SampleID: "id1", Index: "ATCG"}},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "Adapter,Adapter") {
+		t.Errorf("the Adapter column is written twice:\n%s", out)
+	}
+	if !strings.Contains(out, "SoftwareVersion") {
+		t.Errorf("the other setting is lost:\n%s", out)
+	}
+	// The written sheet must still parse back to the same settings.
+	round, err := parser.Parse(strings.NewReader(out))
+	if err != nil {
+		t.Fatalf("Parse round-trip: %v\noutput:\n%s", err, out)
+	}
+	if round.Settings == nil || round.Settings.Adapter != "AGATCG" {
+		t.Errorf("round-trip settings = %+v, want the Adapter AGATCG", round.Settings)
+	}
+}
