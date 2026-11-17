@@ -10,10 +10,11 @@ import (
 	"github.com/inful/illsample/internal/parser"
 )
 
-// readFixture reads a file under the package's testdata directory.
+// readFixture reads a file under the module's testdata directory. Every
+// package reads the same fixtures rather than a copy of them.
 func readFixture(t *testing.T, name string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", name))
+	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", name))
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", name, err)
 	}
@@ -178,7 +179,7 @@ func TestVerify_V2OptionalColumnsAreWarnings(t *testing.T) {
 	// optional Sample_Name/Sample_Project columns must not fail the
 	// sheet.
 	sheet, err := parser.Parse(strings.NewReader(
-		"[Data]\nSample_ID,index\nid1,ATCGATCG\n[Reads]\nRead1Cycles,151\n"))
+		"[Header]\nFileFormatVersion,2\n[Data]\nSample_ID,index\nid1,ATCGATCG\n[Reads]\nRead1Cycles,151\n"))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -199,7 +200,8 @@ func TestVerify_V2AdapterRead1CountsAsAdapter(t *testing.T) {
 	// Illumina names the Read 1 adapter "AdapterRead1"; a sheet that
 	// uses it must not be warned about a missing adapter.
 	sheet, err := parser.Parse(strings.NewReader(
-		"[Data]\nSample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCGATCG,P1\n" +
+		"[Header]\nFileFormatVersion,2\n" +
+			"[Data]\nSample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCGATCG,P1\n" +
 			"[Reads]\nRead1Cycles,151\n" +
 			"[BCLConvert_Settings]\nAdapterRead1,AGATCG\n"))
 	if err != nil {
@@ -217,6 +219,7 @@ func TestVerify_V2AdapterRead1CountsAsAdapter(t *testing.T) {
 func TestVerify_PromoteWarningsToErrors(t *testing.T) {
 	sheet := &model.SampleSheet{
 		Format:  model.FormatV2,
+		Header:  map[string]string{"FileFormatVersion": "2"},
 		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
 		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		// No Settings -> triggers W_V2_NO_ADAPTER
@@ -369,6 +372,7 @@ func TestVerify_MiSeqColumnSpellings(t *testing.T) {
 	// verifier must accept it, like the parser does.
 	sheet := &model.SampleSheet{
 		Format:  model.FormatV2,
+		Header:  map[string]string{"FileFormatVersion": "2"},
 		Columns: []string{"SampleID", "Sample_Name", "Index", "Index2"},
 		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
@@ -452,6 +456,31 @@ func TestVerify_SheetBuiltInCode(t *testing.T) {
 	}
 	if len(r.Errors()) != 0 {
 		t.Errorf("errors = %v, want none", r.Errors())
+	}
+}
+
+// TestVerify_MissingHeaderSection checks that a v2 sheet without the
+// [Header] section is an error: Illumina's specification says that
+// the Header and Reads sections are present in every v2 sample sheet.
+func TestVerify_MissingHeaderSection(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Data: []model.Sample{
+			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
+		},
+	}
+	r := Verify(sheet)
+	if got := codes(r)["E_V2_NO_HEADER"]; got != 1 {
+		t.Errorf("E_V2_NO_HEADER = %d, want 1 (codes: %v)", got, codes(r))
+	}
+
+	// A sheet that carries the section is not reported.
+	sheet.Header = map[string]string{"FileFormatVersion": "2", "RunName": "MyRun"}
+	r = Verify(sheet)
+	if got := codes(r)["E_V2_NO_HEADER"]; got != 0 {
+		t.Errorf("E_V2_NO_HEADER = %d, want 0 (codes: %v)", got, codes(r))
 	}
 }
 

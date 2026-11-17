@@ -4,6 +4,24 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `E_V2_NO_HEADER`: a v2 sheet without the `[Header]` section is an
+  error. Illumina's specification says that a sample sheet must begin
+  with the Header section and that the Header and Reads sections are
+  present in every v2 sample sheet; the library already failed a sheet
+  without `[Reads]`, and now fails one without `[Header]` the same
+  way.
+
+### Changed
+- The test fixtures live in one place. The parser, verifier and
+  writer packages each held a copy of the fifteen fixture sheets, so
+  a change to a fixture had to be made four times; they now read the
+  module's `testdata/` directory.
+- The valid v2 fixtures now carry a `[Header]` section, as Illumina's
+  own sheets do.
+
 ## [0.4.0] - 2026-11-17
 
 ### Added

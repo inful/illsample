@@ -169,6 +169,10 @@ A `Sample` holds the columns Illumina defines by name (`SampleID`,
 `SampleName`, `Index`, `Index2`, `SampleProject`, …); anything else
 goes in `Sample.Extra`, keyed by the column name.
 
+A v2 sheet must carry the `[Header]` and `[Reads]` sections —
+Illumina's specification says so, and `Verify` fails a sheet without
+them (`E_V2_NO_HEADER`, `E_V2_NO_READS`).
+
 ### CLI
 
 ```bash
@@ -296,6 +300,7 @@ sample_01,ATCGATCG,TTAA
 | `E_V1_INVALID_SAMPLE_ID`    | error   | `Sample_ID` holds a character outside letters, digits, `-` and `_` |
 | `E_V1_LONG_SAMPLE_ID`       | error   | `Sample_ID` is longer than 100 characters |
 | `E_V2_NO_DATA`              | error   | `[Data]` section has no rows |
+| `E_V2_NO_HEADER`            | error   | `[Header]` section is missing |
 | `E_V2_NO_READS`             | error   | `[Reads]` section is missing |
 | `E_V2_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
 | `E_V2_MISSING_INDEX`        | error   | `index` column missing |
