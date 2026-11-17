@@ -335,3 +335,19 @@ func findRepoRoot(t *testing.T) string {
 		dir = parent
 	}
 }
+
+// TestCLI_Convert_OutputValidates checks that the sheet the converter
+// writes is one the tool accepts. The tool must not produce output it
+// rejects.
+func TestCLI_Convert_OutputValidates(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "v2.csv")
+	if _, _, exit := run(t, "convert", "-f", "v2", "-o", out, filepath.Join(repoRoot, "testdata", "v1_single_index.csv")); exit != 0 {
+		t.Fatalf("convert: exit = %d, want 0", exit)
+	}
+	stdout, stderr, exit := run(t, "validate", out)
+	if exit != 0 {
+		t.Errorf("the converted sheet does not validate: exit = %d, stdout = %q, stderr = %q", exit, stdout, stderr)
+	}
+}

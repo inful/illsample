@@ -63,18 +63,17 @@ func issueCode(sev Severity, format model.Format, suffix string) string {
 
 // allRules is the complete set of rules, in the order they are
 // evaluated. The order is chosen so that "structural" issues (no
-// data, no reads, missing required columns) are reported before
+// data, no header, missing required columns) are reported before
 // per-row issues, and warnings are reported after errors.
 //
 // Rules that apply to both v1 and v2 are listed first within each
 // tier so the firing order is consistent across formats. v2-only
-// rules are interleaved at the natural position (e.g. NO_READS right
-// after NO_DATA, INDEX_VS_READS after INDEX_LENGTH_MISMATCH).
+// rules are interleaved at the natural position (e.g. INDEX_VS_READS
+// after INDEX_LENGTH_MISMATCH).
 var allRules = []rule{
 	// Structural: presence of required sections / columns.
 	requireData,
 	requireHeaderSection, // v2 only
-	requireReadsSection,  // v2 only
 	requireSampleIDColumn,
 	requireSampleNameColumnV1,
 	requireSampleNameColumnV2,
@@ -94,7 +93,8 @@ var allRules = []rule{
 	validSampleName,
 
 	// Warnings.
-	warnNoAdapter, // v2 only
+	warnNoReadsSection, // v2 only
+	warnNoAdapter,      // v2 only
 	warnDuplicateColumn,
 	warnInconsistentPlateWell,
 	warnInconsistentIndexIDs, // v2 only
@@ -440,13 +440,23 @@ var warnLongSampleName = rule{
 
 // ---- v2-only rules --------------------------------------------------------
 
-var requireReadsSection = rule{
+// warnNoReadsSection reports a v2 sheet without the [Reads] section.
+//
+// Illumina's sequencing specification says that "depending on the
+// software using the Sample Sheet file, some sections may be
+// optional. However, the Header and Data sections are always
+// required." The [Reads] section holds the cycle counts, which some
+// software takes from the run instead of from the sheet, so a sheet
+// without it is not broken -- but the software that needs it will
+// not have them.
+var warnNoReadsSection = rule{
 	suffix:   "NO_READS",
-	severity: SeverityError,
+	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV2},
 	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Reads == nil {
-			r.add(sev, code, "[Reads] section is missing",
+			r.add(sev, code,
+				"[Reads] section is missing; the cycle counts are not in the sheet",
 				Location{Section: "Reads", Row: -1})
 		}
 	},
@@ -458,7 +468,7 @@ var requireRead1Cycles = rule{
 	formats:  []model.Format{model.FormatV2},
 	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
 		if s.Reads == nil {
-			// Already reported by requireReadsSection.
+			// Already reported by warnNoReadsSection.
 			return
 		}
 		if s.Reads.Read1Cycles <= 0 {

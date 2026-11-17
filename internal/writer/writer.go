@@ -197,11 +197,25 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 //
 // The records come from sheet.Header. A sheet that carries the
 // section as an unknown section instead is written from there.
+//
+// A sheet with no records at all still gets the section, with the
+// file format version the writer knows: a v2 sheet must begin with
+// the Header section, and a sheet the library writes must be one the
+// library accepts.
 func writeV2Header(buf *bytes.Buffer, sheet *model.SampleSheet) error {
 	if len(sheet.Header) == 0 {
 		sec, ok := sheet.Extra["Header"]
 		if !ok {
-			return nil
+			if err := writeSectionHeader(buf, "Header"); err != nil {
+				return err
+			}
+			cw := csv.NewWriter(buf)
+			cw.UseCRLF = false
+			if err := cw.Write([]string{"FileFormatVersion", "2"}); err != nil {
+				return err
+			}
+			cw.Flush()
+			return cw.Error()
 		}
 		if err := writeSectionHeader(buf, sec.Name); err != nil {
 			return err

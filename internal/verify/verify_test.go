@@ -126,15 +126,23 @@ func TestVerify_InvalidV1IndexLengthMismatch(t *testing.T) {
 	}
 }
 
-func TestVerify_InvalidV2NoReads(t *testing.T) {
-	sheet, err := parser.Parse(strings.NewReader(readFixture(t, "invalid_v2_no_reads.csv")))
+func TestVerify_V2NoReadsIsAWarning(t *testing.T) {
+	// Illumina's specification says that "depending on the software
+	// using the Sample Sheet file, some sections may be optional.
+	// However, the Header and Data sections are always required." A
+	// sheet without the [Reads] section is therefore not broken: the
+	// cycle counts are not in the sheet.
+	sheet, err := parser.Parse(strings.NewReader(readFixture(t, "v2_no_reads.csv")))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
 	r := Verify(sheet)
 	c := codes(r)
-	if c["E_V2_NO_READS"] == 0 {
-		t.Errorf("expected E_V2_NO_READS, got codes: %v", c)
+	if c["W_V2_NO_READS"] != 1 {
+		t.Errorf("W_V2_NO_READS = %d, want 1 (codes: %v)", c["W_V2_NO_READS"], c)
+	}
+	if len(r.Errors()) != 0 {
+		t.Errorf("errors = %+v, want none", r.Errors())
 	}
 }
 

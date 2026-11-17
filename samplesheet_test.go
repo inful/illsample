@@ -93,24 +93,26 @@ func TestParse_InvalidV1DetectedByVerify(t *testing.T) {
 	}
 }
 
-func TestParse_InvalidV2DetectedByVerify(t *testing.T) {
-	in := readFixture(t, "invalid_v2_no_reads.csv")
+func TestParse_V2NoReadsDetectedByVerify(t *testing.T) {
+	// A sheet without the [Reads] section is not broken, but the
+	// finding must be reported.
+	in := readFixture(t, "v2_no_reads.csv")
 	sheet, err := illsample.Parse(strings.NewReader(in))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
 	result := illsample.Verify(sheet)
-	if !result.HasErrors() {
-		t.Fatal("expected errors, got none")
+	if result.HasErrors() {
+		t.Fatalf("expected no errors, got: %+v", result.Errors())
 	}
 	found := false
-	for _, iss := range result.Errors() {
-		if iss.Code == "E_V2_NO_READS" {
+	for _, iss := range result.Warnings() {
+		if iss.Code == "W_V2_NO_READS" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected E_V2_NO_READS, got: %+v", result.Errors())
+		t.Errorf("expected W_V2_NO_READS, got: %+v", result.Warnings())
 	}
 }
 
