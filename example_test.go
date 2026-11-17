@@ -26,8 +26,8 @@ sample_02,sample_two,GCTAGCTA,RNAseq
 // This example shows how to detect specific verification issues.
 func ExampleVerify() {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  illsample.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCG", SampleProject: "P1"},
 			{SampleID: "id1", SampleName: "name2", Index: "GCTA", SampleProject: "P1"},
@@ -47,8 +47,8 @@ func ExampleVerify() {
 // other in memory.
 func ExampleWrite() {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  illsample.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCG", SampleProject: "P1"},
 		},
@@ -66,13 +66,65 @@ func ExampleWrite() {
 	// id1,name1,,,,ATCG,,,P1,
 }
 
+// This example shows how to build a v2 sample sheet from scratch: the
+// run metadata in Header, the run layout in Reads, and the samples in
+// Data.
+func ExampleSampleSheet() {
+	sheet := &illsample.SampleSheet{
+		Format: illsample.FormatV2,
+		Header: map[string]string{
+			"FileFormatVersion": "2",
+			"RunName":           "MyRun",
+		},
+		Reads: &illsample.Reads{
+			Read1Cycles:  151,
+			Read2Cycles:  151,
+			Index1Cycles: 8,
+			Index2Cycles: 8,
+		},
+		Data: []illsample.Sample{
+			{
+				SampleID:      "sample_01",
+				SampleName:    "sample_one",
+				SamplePlate:   "plate1",
+				SampleWell:    "A1",
+				Index:         "ATCGATCG",
+				Index2:        "GCTAGCTA",
+				SampleProject: "RNAseq",
+			},
+		},
+	}
+	var buf bytes.Buffer
+	if err := illsample.Write(&buf, sheet); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Print(buf.String())
+	// Output:
+	// [Header]
+	// FileFormatVersion,2
+	// RunName,MyRun
+	// [Reads]
+	// Read1Cycles
+	// 151
+	// Read2Cycles
+	// 151
+	// Index1Cycles
+	// 8
+	// Index2Cycles
+	// 8
+	// [Data]
+	// Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+	// sample_01,sample_one,plate1,A1,,ATCGATCG,,GCTAGCTA,RNAseq,
+}
+
 // This example shows how to gate a build pipeline on validation
 // errors using VerifyWithOptions to treat warnings as errors.
 func ExampleVerifyWithOptions() {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  illsample.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		// No Settings -> W_V2_NO_ADAPTER warning.
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},

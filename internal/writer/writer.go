@@ -4,7 +4,7 @@
 // The Write function chooses the format from sheet.Format; callers
 // that want a specific layout should use WriteV1 or WriteV2. Writing
 // is symmetric to the parser: every column or section that the parser
-// preserved (e.g. in sheet.Header or sheet.Extra) is written back so
+// preserved (e.g. in sheet.Columns or sheet.Extra) is written back so
 // that a round-trip is lossless for well-formed input.
 //
 // Note on line endings: this package emits LF, whereas IEM produces
@@ -51,7 +51,7 @@ func Write(w io.Writer, sheet *model.SampleSheet) error {
 
 // WriteV1 writes sheet in v1 (legacy single-CSV) format.
 func WriteV1(w io.Writer, sheet *model.SampleSheet) error {
-	header := sheet.Header
+	header := sheet.Columns
 	if len(header) == 0 {
 		header = defaultHeaderV1
 	}
@@ -113,13 +113,8 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 	var buf bytes.Buffer
 
 	// [Header] comes first, if the sheet has one.
-	if sec, ok := sheet.Extra["Header"]; ok {
-		if err := writeSectionHeader(&buf, sec.Name); err != nil {
-			return err
-		}
-		if err := writeV2GenericSection(&buf, sec); err != nil {
-			return err
-		}
+	if err := writeV2Header(&buf, sheet); err != nil {
+		return err
 	}
 
 	// [Reads]
@@ -188,6 +183,41 @@ func WriteV2(w io.Writer, sheet *model.SampleSheet) error {
 	return nil
 }
 
+// writeV2Header writes the [Header] section: the run metadata that
+// Illumina's specification puts at the top of every v2 sample sheet.
+//
+// The records come from sheet.Header. A sheet that carries the
+// section as an unknown section instead is written from there.
+func writeV2Header(buf *bytes.Buffer, sheet *model.SampleSheet) error {
+	if len(sheet.Header) == 0 {
+		sec, ok := sheet.Extra["Header"]
+		if !ok {
+			return nil
+		}
+		if err := writeSectionHeader(buf, sec.Name); err != nil {
+			return err
+		}
+		return writeV2GenericSection(buf, sec)
+	}
+	if err := writeSectionHeader(buf, "Header"); err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(sheet.Header))
+	for k := range sheet.Header {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	cw := csv.NewWriter(buf)
+	cw.UseCRLF = false
+	for _, k := range keys {
+		if err := cw.Write([]string{csvSafe(k), csvSafe(sheet.Header[k])}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
 // writeSectionHeader writes "[<name>]\n" to buf.
 func writeSectionHeader(buf *bytes.Buffer, name string) error {
 	if _, err := fmt.Fprintf(buf, "[%s]\n", name); err != nil {
@@ -215,7 +245,7 @@ func v2DataHeader(sheet *model.SampleSheet) []string {
 		seen[strings.ToLower(c)] = struct{}{}
 	}
 	// Source-header order: append any column that isn't already there.
-	for _, h := range sheet.Header {
+	for _, h := range sheet.Columns {
 		key := strings.ToLower(strings.TrimSpace(h))
 		if key == "" {
 			continue

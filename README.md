@@ -30,7 +30,7 @@ dialects.
 - **Verify** with a layered model. Each finding is an `Issue` tagged with a
   `Severity` (error or warning) and a `Location` (sheet / section / row / column).
   Use `VerifyOptions` to suppress warnings or promote them to errors.
-- **CLI** with `validate`, `convert`, and `info` subcommands for shell pipelines.
+- **CLI** with `validate`, `new`, `convert`, and `info` subcommands for shell pipelines.
 - **Zero external dependencies.** Pure standard library.
 - **Fuzzed.** The parser and the writer are exercised by `go test -fuzz`
   to guard against panics on malformed input and against a write that
@@ -113,6 +113,62 @@ func main() {
 }
 ```
 
+### Building a sheet
+
+To create a sheet rather than read one, fill in a `SampleSheet`:
+
+```go
+sheet := &illsample.SampleSheet{
+    Format: illsample.FormatV2,
+    // Header is the [Header] section: the run metadata Illumina's
+    // specification puts at the top of every v2 sheet.
+    Header: map[string]string{
+        "FileFormatVersion": "2",
+        "RunName":           "MyRun",
+    },
+    // Reads is the [Reads] section: the run layout.
+    Reads: &illsample.Reads{
+        Read1Cycles:  151,
+        Read2Cycles:  151,
+        Index1Cycles: 8,
+        Index2Cycles: 8,
+    },
+    // Data is the [Data] section: one Sample per row.
+    Data: []illsample.Sample{
+        {
+            SampleID:      "sample_01",
+            SampleName:    "sample_one",
+            SamplePlate:   "plate1",
+            SampleWell:    "A1",
+            Index:         "ATCGATCG",
+            Index2:        "GCTAGCTA",
+            SampleProject: "RNAseq",
+        },
+    },
+}
+
+if err := illsample.Write(os.Stdout, sheet); err != nil {
+    panic(err)
+}
+```
+
+The model in one table:
+
+| Field | What it is |
+|-------|------------|
+| `Format` | `FormatV1` or `FormatV2`; picks the writer |
+| `Header` | the `[Header]` section, as key/value pairs (v2 only) |
+| `Columns` | the column names of the data section |
+| `Reads` | the `[Reads]` section (v2 only) |
+| `Settings` | the `[Settings]` section (v2 only) |
+| `Manifests` | the `[Manifests]` section (v2 only) |
+| `Data` | the samples, one `Sample` per row |
+| `Extra` | sections the model does not name, kept for round-trips |
+
+A `Sample` holds the columns Illumina defines by name (`SampleID`,
+`SampleName`, `Index`, `Index2`, `SampleProject`, …); anything else
+goes in `Sample.Extra`, keyed by the column name.
+
 ### CLI
 
 ```bash
@@ -128,6 +184,10 @@ illsample validate -f v2 SampleSheet.csv
 
 # Print a summary of the sheet.
 illsample info SampleSheet.csv
+
+# Start a sheet to fill in; v2 by default, -f v1 for the legacy layout.
+illsample new > Sheet.csv
+illsample new -f v1 > Sheet.csv
 
 # Convert v1 to v2.
 illsample convert -f v2 SampleSheet.csv > Sheet_v2.csv
@@ -280,7 +340,8 @@ The most useful entry points are:
 The data model is documented in
 [`internal/model/model.go`](internal/model/model.go). The two most
 useful types are `SampleSheet` (a parsed sheet) and `Sample` (a single
-data row).
+data row); [Building a sheet](#building-a-sheet) shows how to fill one
+in.
 
 ## Quirks the parser handles
 

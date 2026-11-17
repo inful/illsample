@@ -379,8 +379,8 @@ var warnDuplicateColumn = rule{
 	severity: SeverityWarning,
 	formats:  []model.Format{model.FormatV1, model.FormatV2},
 	check: func(format model.Format, s *model.SampleSheet, code string, sev Severity, r *VerificationResult) {
-		seen := make(map[string]bool, len(s.Header))
-		for _, h := range s.Header {
+		seen := make(map[string]bool, len(s.Columns))
+		for _, h := range s.Columns {
 			name := strings.ToLower(strings.TrimSpace(h))
 			if name == "" {
 				continue
@@ -567,14 +567,43 @@ var warnInconsistentIndexIDs = rule{
 // knows: the MiSeq guide writes the identifier column "SampleID",
 // the sequencing specification writes "Sample_ID", and both are the
 // same column.
+//
+// A parsed sheet carries its column names in Columns. A sheet that
+// was built in code may not: there the column is there when a sample
+// holds a value for it. Without this a hand-built sheet is told that
+// the columns it plainly has are missing.
 func sheetsColumnHeaderContains(s *model.SampleSheet, name string) bool {
 	want := strings.ToLower(name)
-	for _, h := range s.Header {
+	for _, h := range s.Columns {
 		lh := strings.ToLower(strings.TrimSpace(h))
 		if lh == want {
 			return true
 		}
 		if c := model.ColumnByName(lh); c != nil && strings.ToLower(c.CanonicalName()) == want {
+			return true
+		}
+	}
+	if len(s.Columns) > 0 {
+		return false
+	}
+	// The sheet declares no columns, so it was built in code: its
+	// columns are the ones the samples carry.
+	for i := range s.Data {
+		if sampleHasColumn(&s.Data[i], want) {
+			return true
+		}
+	}
+	return false
+}
+
+// sampleHasColumn reports whether a sample holds a value for the
+// column with that name.
+func sampleHasColumn(sample *model.Sample, want string) bool {
+	if c := model.ColumnByName(want); c != nil && c.Get(sample) != "" {
+		return true
+	}
+	for k, v := range sample.Extra {
+		if v != "" && strings.EqualFold(strings.TrimSpace(k), want) {
 			return true
 		}
 	}

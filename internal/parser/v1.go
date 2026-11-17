@@ -61,9 +61,9 @@ func parseV1(data []byte) (*model.SampleSheet, error) {
 	}
 
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: header,
-		Data:   make([]model.Sample, 0, len(records)-1),
+		Format:  model.FormatV1,
+		Columns: header,
+		Data:    make([]model.Sample, 0, len(records)-1),
 	}
 
 	for rowNum, row := range records[1:] {

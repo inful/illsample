@@ -133,8 +133,8 @@ func TestParseV2_SectionLabelWithPaddedCommas(t *testing.T) {
 	if len(sheet.Data) != 1 {
 		t.Errorf("len(Data) = %d, want 1", len(sheet.Data))
 	}
-	if _, ok := sheet.Extra["Header"]; !ok {
-		t.Errorf("Extra[Header] missing, got %v", sheet.Extra)
+	if got, want := sheet.Header["Date"], "2007-01-26"; got != want {
+		t.Errorf("Header[Date] = %q, want %q (got %v)", got, want, sheet.Header)
 	}
 }
 

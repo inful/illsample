@@ -4,6 +4,32 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `illsample new` writes a sample sheet to fill in: a v2 sheet by
+  default, `-f v1` for the legacy layout, `-o FILE` to write it
+  somewhere other than stdout.
+- `SampleSheet.Header` holds the records of the `[Header]` section —
+  the run metadata that Illumina's specification puts at the top of
+  every v2 sheet — as key/value pairs.
+
+### Changed
+- `SampleSheet.Header` no longer holds the column names of the data
+  section. That field is now `SampleSheet.Columns`. The old name was
+  a trap: in sample-sheet language "Header" is the `[Header]`
+  section, and the field it named was silently ignored by the v2
+  writer.
+- The v2 writer emits the `[Header]` section from
+  `SampleSheet.Header`, so the run metadata no longer has to be built
+  as an unknown section in `SampleSheet.Extra`.
+
+### Fixed
+- A sheet built in code is no longer told that the columns it has
+  are missing. The rules that look for a column now fall back to the
+  samples when the sheet declares no columns, so a hand-built sheet
+  verifies on its own terms.
+
 ## [0.3.0] - 2026-11-16
 
 ### Added

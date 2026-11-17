@@ -237,8 +237,8 @@ func TestWrite_UnknownFormat(t *testing.T) {
 
 func TestWriteV1_EmptyData(t *testing.T) {
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 	}
 	var buf bytes.Buffer
 	if err := WriteV1(&buf, sheet); err != nil {
@@ -365,12 +365,8 @@ func TestWriteV2_HeaderSectionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse round-trip: %v", err)
 	}
-	sec, ok := round.Extra["Header"]
-	if !ok {
-		t.Fatalf("Extra[Header] lost, got %v", round.Extra)
-	}
-	if len(sec.Rows) != 1 || sec.Rows[0][0] != "FileFormatVersion" {
-		t.Errorf("Extra[Header].Rows = %v, want the FileFormatVersion row", sec.Rows)
+	if got := round.Header["FileFormatVersion"]; got != "2" {
+		t.Errorf("Header[FileFormatVersion] = %q, want 2 (got %v)", got, round.Header)
 	}
 }
 
@@ -379,8 +375,8 @@ func TestWriteV1_HeaderHasAliasAndDataHasCanonical(t *testing.T) {
 	// in Extra. The writer should not duplicate the alias as a
 	// separate column.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{
 				SampleID:      "id1",
@@ -416,9 +412,9 @@ func TestWrite_CSVInjectionEscaped(t *testing.T) {
 	for _, dangerous := range cases {
 		t.Run(dangerous, func(t *testing.T) {
 			sheet := &model.SampleSheet{
-				Format: model.FormatV2,
-				Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-				Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+				Format:  model.FormatV2,
+				Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+				Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 				Data: []model.Sample{
 					{SampleID: "id1", SampleName: dangerous, Index: "ATCGATCG", SampleProject: "P1"},
 				},
@@ -442,8 +438,8 @@ func TestWrite_CSVInjectionSafeValue(t *testing.T) {
 	// A value that does NOT start with a dangerous char must pass
 	// through unchanged. This protects against an over-eager escape.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "normal_name", Index: "ATCG", SampleProject: "P1"},
 		},
@@ -472,9 +468,9 @@ func TestWrite_CSVInjectionRoundTrip(t *testing.T) {
 	for _, dangerous := range cases {
 		t.Run(dangerous, func(t *testing.T) {
 			sheet := &model.SampleSheet{
-				Format: model.FormatV2,
-				Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-				Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+				Format:  model.FormatV2,
+				Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+				Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 				Data: []model.Sample{
 					{SampleID: "id1", SampleName: dangerous, Index: "ATCGATCG", SampleProject: "P1"},
 				},
@@ -503,9 +499,9 @@ func TestWriteV2_PreservesExtraColumns(t *testing.T) {
 	// Regression test for HI-01: a v2 sheet carrying a custom
 	// column must round-trip the column through the writer.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "CustomColumn"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "CustomColumn"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []model.Sample{
 			{
 				SampleID:      "id1",
@@ -543,8 +539,8 @@ func TestWriteV2_AliasColumnNotDuplicated(t *testing.T) {
 	// should round-trip as the single canonical "I7_Index_ID"
 	// column, not as both the canonical column and the alias.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "I7IndexID", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "I7IndexID", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "name1", I7IndexID: "UDI001", Index: "ATCG", SampleProject: "P1"},
 		},
@@ -570,9 +566,9 @@ func TestWriteV2_PreservesExtraColumnsFromHeaderOnly(t *testing.T) {
 	// sample's Extra (i.e. an empty column) must still be emitted so
 	// that the column order is preserved.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "Assay"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description", "Assay"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
 		},
@@ -592,9 +588,9 @@ func TestWriteV2_PaddedHeaderColumnPreserved(t *testing.T) {
 	// values on round-trip. The parser trims the header, so the
 	// writer has to look the column up under the trimmed name.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "index", "Notes"},
-		Reads:  &model.Reads{Read1Cycles: 151},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "index", "Notes"},
+		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
 			{SampleID: "id1", Index: "ATCGATCG", Extra: map[string]string{"Notes": "keepme"}},
 		},
@@ -687,8 +683,8 @@ func TestWriteV1_OneColumnEmptyCellSurvives(t *testing.T) {
 	// A record with a single empty cell would be a blank line, which
 	// the reader skips. The writer must not lose the cell.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{""},
+		Format:  model.FormatV1,
+		Columns: []string{""},
 		Data: []model.Sample{
 			{Extra: map[string]string{"": "first"}},
 			{Extra: map[string]string{"": ""}},
@@ -714,8 +710,8 @@ func TestWriteV1_AppendsUnknownExtraColumns(t *testing.T) {
 	// A column that is not in the header AND not an alias of a
 	// header column should be appended at the end of the header.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{
 				SampleID:      "id1",

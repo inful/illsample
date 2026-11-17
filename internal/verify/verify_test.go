@@ -216,9 +216,9 @@ func TestVerify_V2AdapterRead1CountsAsAdapter(t *testing.T) {
 
 func TestVerify_PromoteWarningsToErrors(t *testing.T) {
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		// No Settings -> triggers W_V2_NO_ADAPTER
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
@@ -242,9 +242,9 @@ func TestVerify_PromoteWarningsToErrors(t *testing.T) {
 
 func TestVerify_SuppressWarnings(t *testing.T) {
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
 		},
@@ -299,8 +299,8 @@ func TestVerify_EmptyResultIsOK(t *testing.T) {
 
 func TestVerify_InconsistentPlateWell(t *testing.T) {
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "n1", SamplePlate: "p1", SampleWell: "A1", Index: "ATCG", SampleProject: "P1"},
 			{SampleID: "id2", SampleName: "n2", Index: "GCTA", SampleProject: "P1"},
@@ -315,8 +315,8 @@ func TestVerify_InconsistentPlateWell(t *testing.T) {
 func TestVerify_LongSampleName(t *testing.T) {
 	long := strings.Repeat("x", 200)
 	sheet := &model.SampleSheet{
-		Format: model.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  model.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: long, Index: "ATCG", SampleProject: "P1"},
 		},
@@ -331,9 +331,9 @@ func TestVerify_SampleIDCharacters(t *testing.T) {
 	// The specification allows letters, digits, dashes and underscores
 	// in a Sample_ID, and nothing else.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "index"},
-		Reads:  &model.Reads{Read1Cycles: 151},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "index"},
+		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
 			{SampleID: "id-1_ok", Index: "ATCGATCG"},
 			{SampleID: "id 2", Index: "GCTAGCTA"},
@@ -349,9 +349,9 @@ func TestVerify_SampleIDCharacters(t *testing.T) {
 func TestVerify_SampleIDTooLong(t *testing.T) {
 	// The specification limits the Sample_ID to 100 characters.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "index"},
-		Reads:  &model.Reads{Read1Cycles: 151},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "index"},
+		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
 			{SampleID: strings.Repeat("x", 101), Index: "ATCGATCG"},
 			{SampleID: strings.Repeat("x", 100), Index: "GCTAGCTA"},
@@ -368,9 +368,9 @@ func TestVerify_MiSeqColumnSpellings(t *testing.T) {
 	// The MiSeq guide writes the identifier column "SampleID". The
 	// verifier must accept it, like the parser does.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"SampleID", "Sample_Name", "Index", "Index2"},
-		Reads:  &model.Reads{Read1Cycles: 151},
+		Format:  model.FormatV2,
+		Columns: []string{"SampleID", "Sample_Name", "Index", "Index2"},
+		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
 			{SampleID: "A10001", SampleName: "Sample_A", Index: "ATTACTCG", Index2: "TATAGCCT"},
 		},
@@ -426,13 +426,42 @@ func TestReadmeRulesTable(t *testing.T) {
 	}
 }
 
+// TestVerify_SheetBuiltInCode checks that a sheet built in code, with
+// no declared columns, is not told that the columns it plainly has
+// are missing.
+func TestVerify_SheetBuiltInCode(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: map[string]string{"FileFormatVersion": "2"},
+		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Data: []model.Sample{
+			{SampleID: "sample_01", SampleName: "sample_one", Index: "ATCGATCG", SampleProject: "RNAseq"},
+		},
+	}
+	r := Verify(sheet)
+	c := codes(r)
+	for _, code := range []string{
+		"E_V2_MISSING_SAMPLE_ID",
+		"E_V2_MISSING_INDEX",
+		"W_V2_MISSING_SAMPLE_NAME",
+		"W_V2_MISSING_SAMPLE_PROJECT",
+	} {
+		if c[code] != 0 {
+			t.Errorf("a sheet built in code must not report %s, got codes: %v", code, c)
+		}
+	}
+	if len(r.Errors()) != 0 {
+		t.Errorf("errors = %v, want none", r.Errors())
+	}
+}
+
 func TestVerify_DuplicateColumn(t *testing.T) {
 	// The section requirements say that the column headers must all be
 	// unique; a repeated name is ignored, so the first one wins.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "index", "Index"},
-		Reads:  &model.Reads{Read1Cycles: 151},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "index", "Index"},
+		Reads:   &model.Reads{Read1Cycles: 151},
 		Data: []model.Sample{
 			{SampleID: "id1", Index: "ATCGATCG"},
 		},
@@ -446,9 +475,9 @@ func TestVerify_DuplicateColumn(t *testing.T) {
 
 func TestVerify_V2IndexIDsInconsistent(t *testing.T) {
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8, Index2Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8, Index2Cycles: 8},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "n1", I7IndexID: "UDI1", Index: "ATCGATCG", I5IndexID: "UDI2", Index2: "GCTAGCTA", SampleProject: "P1"},
 			{SampleID: "id2", SampleName: "n2", I7IndexID: "UDI3", Index: "GCTAGCTA", SampleProject: "P1"},
@@ -465,9 +494,9 @@ func TestVerify_V2IndexIDsInconsistentWithoutI5Column(t *testing.T) {
 	// A sheet that carries only I7_Index_ID must still be warned when
 	// some rows fill it and others do not.
 	sheet := &model.SampleSheet{
-		Format: model.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "I7_Index_ID", "index", "Sample_Project"},
-		Reads:  &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  model.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "I7_Index_ID", "index", "Sample_Project"},
+		Reads:   &model.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []model.Sample{
 			{SampleID: "id1", SampleName: "n1", I7IndexID: "UDI1", Index: "ATCGATCG", SampleProject: "P1"},
 			{SampleID: "id2", SampleName: "n2", Index: "GCTAGCTA", SampleProject: "P1"},
