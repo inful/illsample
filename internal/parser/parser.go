@@ -239,11 +239,22 @@ func preambleLine(s string) bool {
 }
 
 // isSectionHeader reports whether s looks like a [Name] section header.
+//
 // The specification allows a section label to be padded with commas
 // ("[Header],,,,,,"), so the commas are stripped before the check.
+//
+// The name must not be empty and must not hold a comma: the
+// specification says that "there can only be one data item in a
+// section header line". A data row whose first cell holds brackets
+// ("[],,,,") would otherwise be read as a header, and the sample
+// would be lost without a word.
 func isSectionHeader(s string) bool {
 	s = strings.TrimRight(s, ",")
-	return strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") && len(s) >= 2
+	if !strings.HasPrefix(s, "[") || !strings.HasSuffix(s, "]") || len(s) < 2 {
+		return false
+	}
+	name := sectionName(s)
+	return name != "" && !strings.Contains(name, ",")
 }
 
 // sectionName extracts the section name from a [Name] header.
