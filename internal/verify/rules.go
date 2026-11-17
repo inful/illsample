@@ -545,7 +545,7 @@ var warnNoAdapter = rule{
 		}
 		// Illumina's BCL Convert dialect names the Read 1 adapter
 		// "AdapterRead1" rather than "Adapter"; either one counts.
-		if settingsValue(s.Settings, "Adapter") == "" && settingsValue(s.Settings, "AdapterRead1") == "" {
+		if s.Settings.AdapterSequence() == "" {
 			r.add(sev, code,
 				"no Adapter sequence in [Settings]; consider specifying one",
 				Location{Section: "Settings", Row: -1, Column: "Adapter"})
@@ -644,26 +644,4 @@ func sampleHasColumn(sample *model.Sample, want string) bool {
 		}
 	}
 	return false
-}
-
-// settingsValue returns the value of a settings key, matched
-// case-insensitively. The two typed fields are checked first, then the
-// Extra map, which holds the keys the model does not know about (e.g.
-// Illumina's "AdapterRead1").
-func settingsValue(s *model.Settings, key string) string {
-	if s == nil {
-		return ""
-	}
-	switch strings.ToLower(key) {
-	case "adapter":
-		return s.Adapter
-	case "adapterread2":
-		return s.AdapterRead2
-	}
-	for k, v := range s.Extra {
-		if strings.EqualFold(k, key) {
-			return v
-		}
-	}
-	return ""
 }

@@ -351,3 +351,17 @@ func TestCLI_Convert_OutputValidates(t *testing.T) {
 		t.Errorf("the converted sheet does not validate: exit = %d, stdout = %q, stderr = %q", exit, stdout, stderr)
 	}
 }
+
+// TestCLI_Info_AdapterRead1 checks that the summary shows the read 1
+// adapter when the sheet names it "AdapterRead1", as Illumina's own
+// TSO 500 templates do.
+func TestCLI_Info_AdapterRead1(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+	stdout, _, exit := run(t, "info", filepath.Join(repoRoot, "testdata", "illumina", "Sample_Sheet_Template_TSO 500_i5Rev_Std_Local.csv"))
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout, "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA") {
+		t.Errorf("stdout should contain the read 1 adapter, got %q", stdout)
+	}
+}
