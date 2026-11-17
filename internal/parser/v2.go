@@ -66,6 +66,10 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 			if err := parseDataSection(p, sheet); err != nil {
 				return nil, err
 			}
+		case "header":
+			if err := parseHeaderSection(p, sheet); err != nil {
+				return nil, err
+			}
 		case "reads":
 			if err := parseReadsSection(p, sheet); err != nil {
 				return nil, err
@@ -89,6 +93,41 @@ func parseV2(lines []string) (*model.SampleSheet, error) {
 		}
 	}
 	return sheet, nil
+}
+
+// parseHeaderSection reads the [Header] section: the run metadata
+// that Illumina's specification puts at the top of every v2 sample
+// sheet. Its records are key-value pairs.
+func parseHeaderSection(p *lineParser, sheet *model.SampleSheet) error {
+	raw, startLine, err := collectSection(p)
+	if err != nil {
+		return err
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	records, err := readCSV(raw, startLine)
+	if err != nil {
+		return err
+	}
+	for _, rec := range records {
+		if len(rec) == 0 {
+			continue
+		}
+		key := strings.TrimSpace(rec[0])
+		if key == "" {
+			continue
+		}
+		value := ""
+		if len(rec) > 1 {
+			value = strings.TrimSpace(rec[1])
+		}
+		if sheet.Header == nil {
+			sheet.Header = make(map[string]string)
+		}
+		sheet.Header[key] = value
+	}
+	return nil
 }
 
 // parseDataSection reads a [Data] section. The section is a header line
@@ -120,7 +159,7 @@ func parseDataSection(p *lineParser, sheet *model.SampleSheet) error {
 	for i, h := range header {
 		header[i] = strings.TrimSpace(h)
 	}
-	sheet.Header = append(sheet.Header, header...)
+	sheet.Columns = append(sheet.Columns, header...)
 	colIdx := make(map[string]int, len(header))
 	for i, name := range header {
 		key := strings.ToLower(strings.TrimSpace(name))

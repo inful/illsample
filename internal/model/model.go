@@ -37,12 +37,21 @@ type SampleSheet struct {
 	// Format is the layout version. Set by the parser; the writer uses it
 	// to choose the appropriate serializer.
 	Format Format
-	// Header records the column order of the data section, populated
+	// Header holds the records of the [Header] section: the run
+	// metadata that Illumina's specification puts at the top of every
+	// v2 sample sheet, such as "RunName" or "FileFormatVersion".
+	//
+	// It is nil for v1 sheets, which have no sections. The writer
+	// emits the section first, as the specification asks, and writes
+	// the records in name order; a section that must keep the order
+	// it was read in can be carried in Extra instead.
+	Header map[string]string
+	// Columns records the column names of the data section, populated
 	// from the source for both v1 and v2 sheets. The v2 writer always
-	// emits the canonical column order regardless of Header, so Header
-	// is informational; the verifier and the v1 writer use it to
-	// detect missing columns and to round-trip column order.
-	Header []string
+	// emits the canonical column order regardless of Columns, so
+	// Columns is informational there; the verifier and the v1 writer
+	// use it to detect missing columns and to round-trip column order.
+	Columns []string
 	// Reads holds the [Reads] section of a v2 sheet. Nil for v1.
 	Reads *Reads
 	// Settings holds the [Settings] section of a v2 sheet. Nil for v1.

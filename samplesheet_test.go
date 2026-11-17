@@ -123,8 +123,8 @@ func TestParse_Empty(t *testing.T) {
 
 func TestWriteV1Explicit(t *testing.T) {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV1,
-		Header: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
+		Format:  illsample.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "Sample_Project"},
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCG", SampleProject: "P1"},
 		},
@@ -144,9 +144,9 @@ func TestWriteV1Explicit(t *testing.T) {
 
 func TestWriteV2Explicit(t *testing.T) {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  illsample.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
 		},
@@ -166,9 +166,9 @@ func TestWriteV2Explicit(t *testing.T) {
 
 func TestVerifyWithOptions_PromoteWarnings(t *testing.T) {
 	sheet := &illsample.SampleSheet{
-		Format: illsample.FormatV2,
-		Header: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
-		Reads:  &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
+		Format:  illsample.FormatV2,
+		Columns: []string{"Sample_ID", "Sample_Name", "Sample_Plate", "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID", "index2", "Sample_Project", "Description"},
+		Reads:   &illsample.Reads{Read1Cycles: 151, Index1Cycles: 8},
 		Data: []illsample.Sample{
 			{SampleID: "id1", SampleName: "name1", Index: "ATCGATCG", SampleProject: "P1"},
 		},

@@ -127,8 +127,8 @@ func TestParseV1_BOM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if len(sheet.Header) == 0 || sheet.Header[0] != "Sample_ID" {
-		t.Errorf("Header[0] = %q, want Sample_ID (no BOM)", sheet.Header[0])
+	if len(sheet.Columns) == 0 || sheet.Columns[0] != "Sample_ID" {
+		t.Errorf("Columns[0] = %q, want Sample_ID (no BOM)", sheet.Columns[0])
 	}
 }
 
@@ -429,7 +429,7 @@ func TestParseV2_HeaderWhitespaceTrimmed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if got, want := sheet.Header[2], "Notes"; got != want {
+	if got, want := sheet.Columns[2], "Notes"; got != want {
 		t.Errorf("Header[2] = %q, want %q", got, want)
 	}
 	if got, want := sheet.Data[0].Extra["Notes"], "keepme"; got != want {
@@ -566,7 +566,7 @@ func TestParseV1_HeaderWhitespaceTrimmed(t *testing.T) {
 		t.Errorf("SampleName = %q, want name1", sheet.Data[0].SampleName)
 	}
 	// Header should be trimmed.
-	for i, h := range sheet.Header {
+	for i, h := range sheet.Columns {
 		if h != "" && (h != strings.TrimSpace(h)) {
 			t.Errorf("Header[%d] = %q, want trimmed", i, h)
 		}
@@ -641,9 +641,9 @@ func TestParseV2_IlluminaBCLConvertDialect(t *testing.T) {
 	if got := sheet.Settings.Extra["SoftwareVersion"]; got != "4.1.27" {
 		t.Errorf("Extra[SoftwareVersion] = %q, want 4.1.27", got)
 	}
-	// The unknown [Header] section is preserved verbatim.
-	if _, ok := sheet.Extra["Header"]; !ok {
-		t.Error("Extra[Header] missing")
+	// The [Header] section is read into the typed field.
+	if got := sheet.Header["FileFormatVersion"]; got != "2" {
+		t.Errorf("Header[FileFormatVersion] = %q, want 2", got)
 	}
 }
 

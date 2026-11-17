@@ -4,6 +4,7 @@
 // Usage:
 //
 //	illsample validate <file>          Parse and verify; exit 0 on success, 1 on errors, 2 on usage errors.
+//	illsample new [-f v1|v2] [-o OUT] Write a sample sheet to fill in.
 //	illsample convert <file>           Convert to the other format; default output is stdout.
 //	illsample convert <file> -o OUT    Write to OUT instead of stdout.
 //	illsample convert <file> -f v1|v2  Force output format (default: the other one).
@@ -42,6 +43,7 @@ Usage:
 
 Commands:
   validate     Parse a sample sheet and run verification rules.
+  new          Write a sample sheet to fill in.
   convert      Re-emit a sample sheet in v1 or v2 format.
   info         Print a summary of a sample sheet.
   version      Print the version and exit.
@@ -61,6 +63,8 @@ func main() {
 	switch cmd {
 	case "validate":
 		os.Exit(runValidate(args))
+	case "new":
+		os.Exit(runNew(args))
 	case "convert":
 		os.Exit(runConvert(args))
 	case "info":
@@ -208,6 +212,93 @@ func runConvert(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// runNew implements the "new" subcommand: it writes a sample sheet
+// to fill in.
+func runNew(args []string) int {
+	fs := newFlagSet("new")
+	out := fs.String("o", "", "output file (default: stdout)")
+	format := fs.String("f", "v2", "format: v1 or v2 (default: v2)")
+	if code, ok := parseFlags(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "new: expected no file argument")
+		return 2
+	}
+	var sheet *illsample.SampleSheet
+	switch strings.ToLower(*format) {
+	case "v1":
+		sheet = newTemplateV1()
+	case "v2":
+		sheet = newTemplateV2()
+	default:
+		fmt.Fprintf(os.Stderr, "new: invalid format %q (want v1 or v2)\n", *format)
+		return 2
+	}
+	var w io.Writer = os.Stdout
+	if *out != "" {
+		f, err := os.Create(*out)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "new: %v\n", err)
+			return 1
+		}
+		defer func() { _ = f.Close() }()
+		w = f
+	}
+	if err := illsample.Write(w, sheet); err != nil {
+		fmt.Fprintf(os.Stderr, "new: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+// newTemplateV2 returns a v2 sample sheet to fill in: the sections
+// Illumina's own template carries, and one example sample.
+func newTemplateV2() *illsample.SampleSheet {
+	return &illsample.SampleSheet{
+		Format: illsample.FormatV2,
+		Header: map[string]string{
+			"FileFormatVersion":  "2",
+			"RunName":            "MyRun",
+			"InstrumentPlatform": "NovaSeq",
+			"InstrumentType":     "NovaSeq",
+		},
+		Reads: &illsample.Reads{
+			Read1Cycles:  151,
+			Read2Cycles:  151,
+			Index1Cycles: 8,
+			Index2Cycles: 8,
+		},
+		Data: []illsample.Sample{
+			{
+				SampleID:      "sample_01",
+				SampleName:    "sample_one",
+				SamplePlate:   "plate1",
+				SampleWell:    "A1",
+				Index:         "ATCGATCG",
+				SampleProject: "Project_Alpha",
+			},
+		},
+	}
+}
+
+// newTemplateV1 returns a v1 sample sheet to fill in: the columns
+// bcl2fastq reads, and one example sample.
+func newTemplateV1() *illsample.SampleSheet {
+	return &illsample.SampleSheet{
+		Format:  illsample.FormatV1,
+		Columns: []string{"Sample_ID", "Sample_Name", "index", "index2", "Sample_Project"},
+		Data: []illsample.Sample{
+			{
+				SampleID:      "sample_01",
+				SampleName:    "sample_one",
+				Index:         "ATCGATCG",
+				SampleProject: "Project_Alpha",
+			},
+		},
+	}
 }
 
 // runInfo implements the "info" subcommand.

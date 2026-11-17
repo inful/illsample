@@ -189,6 +189,53 @@ func TestCLI_Convert(t *testing.T) {
 	}
 }
 
+func TestCLI_New(t *testing.T) {
+	stdout, _, exit := run(t, "new")
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	// The sheet it writes must be one the tool can read back.
+	if !strings.HasPrefix(stdout, "[Header]") {
+		t.Errorf("a new v2 sheet must start with [Header], got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "[Data]") {
+		t.Errorf("a new v2 sheet must have a [Data] section, got:\n%s", stdout)
+	}
+
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "new.csv")
+	if _, _, exit := run(t, "new", "-o", out); exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	_, stderr, exit := run(t, "validate", out)
+	if exit != 0 {
+		t.Errorf("the generated sheet does not validate: exit = %d, stderr = %q", exit, stderr)
+	}
+}
+
+func TestCLI_New_V1(t *testing.T) {
+	stdout, _, exit := run(t, "new", "-f", "v1")
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0", exit)
+	}
+	if !strings.HasPrefix(stdout, "Sample_ID,") {
+		t.Errorf("a new v1 sheet must start with its header row, got:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "[") {
+		t.Errorf("a new v1 sheet must have no sections, got:\n%s", stdout)
+	}
+}
+
+func TestCLI_New_BadFormat(t *testing.T) {
+	_, stderr, exit := run(t, "new", "-f", "v9")
+	if exit != 2 {
+		t.Errorf("exit = %d, want 2", exit)
+	}
+	if !strings.Contains(stderr, "invalid format") {
+		t.Errorf("stderr = %q, want to contain 'invalid format'", stderr)
+	}
+}
+
 func TestCLI_Convert_BadFormat(t *testing.T) {
 	repoRoot := findRepoRoot(t)
 	_, stderr, exit := run(t, "convert", "-f", "v9", filepath.Join(repoRoot, "testdata", "v1_single_index.csv"))
