@@ -4,7 +4,7 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-17
 
 ### Changed
 - `E_V2_NO_READS` is now `W_V2_NO_READS`, a warning rather than an
@@ -302,7 +302,8 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - 100% statement coverage on the top-level package; 77% / 91% / 80%
   on the internal packages (parser / verify / writer).
 
-[Unreleased]: https://github.com/inful/illsample/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/inful/illsample/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/inful/illsample/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/inful/illsample/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/inful/illsample/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/inful/illsample/compare/v0.4.0...v0.5.0
