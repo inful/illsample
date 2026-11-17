@@ -375,12 +375,19 @@ func isPairSettings(records []csvRecord) bool {
 	if len(records) == 0 || len(records[0]) != 2 {
 		return false
 	}
+	if len(records) == 1 {
+		// A table has a header row and at least one row of values, so
+		// a section with one record holds a single setting. Illumina's
+		// own template writes "SoftwareVersion,x.y.z", and "x.y.z"
+		// looks like a name.
+		return true
+	}
 	if !isSettingName(records[0][1]) {
 		return true
 	}
 	// With a second record the table layout holds values there, while
 	// the pair layout holds the name of the next setting.
-	return len(records) > 1 && isSettingName(records[1][0])
+	return isSettingName(records[1][0])
 }
 
 // isSettingName reports whether a field looks like the name of a

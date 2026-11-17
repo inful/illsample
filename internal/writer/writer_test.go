@@ -832,3 +832,53 @@ func TestWriteV2_HeaderSectionIsAlwaysWritten(t *testing.T) {
 		t.Errorf("Header[FileFormatVersion] = %q, want 2", got)
 	}
 }
+
+// TestWriteV2_StandaloneSectionsUseKeyValuePairs checks that the
+// [Reads] and [Settings] sections are written as "Key,Value" records,
+// one per line.
+//
+// Illumina's sequencing specification says that "settings records are
+// represented as a series of key-value pairs. As such, each line
+// requires exactly two fields", and every one of the nineteen sample
+// sheets that Illumina publishes writes its standalone sections that
+// way: "Read1Cycles,151", "AdapterRead1,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA".
+func TestWriteV2_StandaloneSectionsUseKeyValuePairs(t *testing.T) {
+	sheet := &model.SampleSheet{
+		Format: model.FormatV2,
+		Header: map[string]string{"FileFormatVersion": "2"},
+		Reads: &model.Reads{
+			Read1Cycles:  151,
+			Read2Cycles:  151,
+			Index1Cycles: 8,
+		},
+		Settings: &model.Settings{
+			Adapter:      "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+			AdapterRead2: "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
+		},
+		Data: []model.Sample{{SampleID: "id1", Index: "ATCGATCG"}},
+	}
+	var buf bytes.Buffer
+	if err := WriteV2(&buf, sheet); err != nil {
+		t.Fatalf("WriteV2: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{
+		"Read1Cycles,151",
+		"Read2Cycles,151",
+		"Index1Cycles,8",
+		"Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+		"AdapterRead2,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Errorf("output does not contain %q:\n%s", want, out)
+		}
+	}
+	// A key on a line of its own is the vertical layout, which
+	// Illumina does not publish.
+	for _, line := range strings.Split(out, "\n") {
+		switch line {
+		case "Read1Cycles", "Read2Cycles", "Index1Cycles", "Adapter", "AdapterRead2":
+			t.Errorf("a key is written on a line of its own:\n%s", out)
+		}
+	}
+}

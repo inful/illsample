@@ -233,16 +233,13 @@ DRAGEN both accept it. The canonical v2 layout is:
 
 ```ini
 [Reads]
-Read1Cycles
-151
-Read2Cycles
-151
-Index1Cycles
-8
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
 
 [Settings]
-Adapter,AdapterRead2
-AGATCGGAAGAGCACACGTCTGAACTCCAGTCA,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+AdapterRead2,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
 
 [Data]
 Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
@@ -254,13 +251,14 @@ The specification says that a sample sheet must begin with the
 them in that order.
 
 - `[Data]` is a CSV section with the canonical column order above.
-- `[Reads]` holds one cycle count per line (read 1, then read 2) in
-  Illumina's own layout, and `Key,Value` pairs or a key with the
-  value on the next line in the IEM and BCL Convert layouts.
-- `[Settings]` holds one `Key,Value` pair per line in Illumina's own
-  layout, and a table with a header row of setting names in the IEM
-  layout. A single-column section is read as a key with its value on
-  the next line.
+- `[Reads]` holds one `Key,Value` pair per line in the layout every
+  sample sheet that Illumina publishes uses (`Read1Cycles,151`). The
+  parser also reads one cycle count per line, as the specification
+  writes it, and a key with its value on the next line.
+- `[Settings]` holds one `Key,Value` pair per line in the layout every
+  sample sheet that Illumina publishes uses (`Adapter,AGATCG…`). The
+  parser also reads a table with a header row of setting names, and a
+  single-column section as a key with its value on the next line.
 - `[Manifests]` (optional) holds one `Key,Filename` pair per line in
   Illumina's own layout, and one path per line in the IEM layout.
 - Any other section is preserved verbatim in `SampleSheet.Extra` so that

@@ -966,3 +966,24 @@ func TestParse_NilReader(t *testing.T) {
 		}
 	}
 }
+
+// TestParseV2_SettingsSingleNameValuedRecord checks that a settings
+// section with one record whose value looks like a name keeps its
+// value. Illumina's own template writes "SoftwareVersion,x.y.z" and
+// "x.y.z" is a lower-case word, so the record looks like a table
+// header.
+func TestParseV2_SettingsSingleNameValuedRecord(t *testing.T) {
+	input := "[Header]\nFileFormatVersion,2\n" +
+		"[Data]\nSample_ID,index\nid1,ATCG\n" +
+		"[Settings]\nSoftwareVersion,x.y.z\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if sheet.Settings == nil {
+		t.Fatal("Settings is nil")
+	}
+	if got := sheet.Settings.Extra["SoftwareVersion"]; got != "x.y.z" {
+		t.Errorf("Settings.Extra[SoftwareVersion] = %q, want x.y.z (settings: %+v)", got, sheet.Settings)
+	}
+}

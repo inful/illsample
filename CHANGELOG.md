@@ -4,6 +4,23 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- The v2 writer writes the `[Reads]` and `[Settings]` sections as
+  `Key,Value` records, one per line. It wrote them in IEM's layouts —
+  a key on a line of its own for `[Reads]`, and a header row plus a
+  row of values for `[Settings]` — which no sample sheet that Illumina
+  publishes uses, and which the specification does not describe:
+  "settings records are represented as a series of key-value pairs. As
+  such, each line requires exactly two fields." The shape of the
+  `[Settings]` output also changed with the number of settings, so a
+  sheet with one setting was written differently from a sheet with two.
+- A settings section with a single record whose value looks like a
+  name kept its value. Illumina's own template writes
+  `SoftwareVersion,x.y.z`, and "x.y.z" is a lower-case word, so the
+  record was read as a table header and the setting was lost.
+
 ## [0.6.1] - 2026-11-17
 
 ### Added

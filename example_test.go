@@ -107,14 +107,10 @@ func ExampleSampleSheet() {
 	// FileFormatVersion,2
 	// RunName,MyRun
 	// [Reads]
-	// Read1Cycles
-	// 151
-	// Read2Cycles
-	// 151
-	// Index1Cycles
-	// 8
-	// Index2Cycles
-	// 8
+	// Read1Cycles,151
+	// Read2Cycles,151
+	// Index1Cycles,8
+	// Index2Cycles,8
 	// [Data]
 	// Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
 	// sample_01,sample_one,plate1,A1,,ATCGATCG,,GCTAGCTA,RNAseq,
