@@ -127,6 +127,26 @@ type Settings struct {
 	Extra        map[string]string
 }
 
+// AdapterSequence returns the read 1 adapter of the sheet.
+//
+// Illumina's BCL Convert dialect names the read 1 adapter
+// "AdapterRead1" rather than "Adapter", and its own TSO 500 templates
+// use that name; either one is the adapter.
+func (s *Settings) AdapterSequence() string {
+	if s == nil {
+		return ""
+	}
+	if s.Adapter != "" {
+		return s.Adapter
+	}
+	for k, v := range s.Extra {
+		if strings.EqualFold(k, "AdapterRead1") {
+			return v
+		}
+	}
+	return ""
+}
+
 // Manifest is one row of the [Manifests] section.
 //
 // Illumina's Sample Sheet specification writes the section as

@@ -4,6 +4,26 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The eleven **DRAGEN TSO 500** sample sheet templates that Illumina
+  publishes are test fixtures now
+  (`testdata/illumina/Sample_Sheet_Template_TSO_500*.csv`): the
+  standard, XP and high-throughput workflows, for the i5-reverse and
+  the i5-forward index orientation, and for the local-launch and
+  auto-launch dialects. They use the padded-comma layout, name the
+  data section `[BCLConvert_Data]`, and carry a
+  `[Sequencing_Settings]` section that no other sheet has.
+- `Settings.AdapterSequence` returns the read 1 adapter under either
+  of the names Illumina uses: `Adapter`, or `AdapterRead1` in the BCL
+  Convert dialect.
+
+### Fixed
+- `illsample info` shows the read 1 adapter of a sheet that names it
+  `AdapterRead1`. It showed an empty adapter, which is wrong for
+  every TSO 500 template.
+
 ## [0.6.0] - 2026-11-17
 
 ### Changed

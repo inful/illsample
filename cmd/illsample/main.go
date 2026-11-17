@@ -338,7 +338,9 @@ func runInfo(args []string) int {
 		fmt.Printf("Index2Cycles:  %d\n", sheet.Reads.Index2Cycles)
 	}
 	if sheet.Settings != nil {
-		fmt.Printf("Adapter:       %s\n", sheet.Settings.Adapter)
+		// The read 1 adapter is named "Adapter" or "AdapterRead1",
+		// depending on the dialect.
+		fmt.Printf("Adapter:       %s\n", sheet.Settings.AdapterSequence())
 		fmt.Printf("AdapterRead2:  %s\n", sheet.Settings.AdapterRead2)
 	}
 	if len(sheet.Manifests) > 0 {
