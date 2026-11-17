@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/inful/illsample/internal/model"
@@ -328,15 +329,19 @@ func writeV2Data(buf *bytes.Buffer, header []string, data []model.Sample) error 
 }
 
 // writeV2Reads writes the [Reads] section in vertical key/value form.
+// writeV2Reads writes the [Reads] section.
+//
+// Illumina's own sheets write the cycle counts as "Key,Value" records,
+// one per line ("Read1Cycles,151"), and the specification describes a
+// standalone section the same way.
 func writeV2Reads(buf *bytes.Buffer, reads *model.Reads) error {
+	cw := csv.NewWriter(buf)
+	cw.UseCRLF = false
 	write := func(key string, n int) error {
 		if n == 0 {
 			return nil
 		}
-		if _, err := fmt.Fprintf(buf, "%s\n%d\n", key, n); err != nil {
-			return err
-		}
-		return nil
+		return cw.Write([]string{key, strconv.Itoa(n)})
 	}
 	if err := write("Read1Cycles", reads.Read1Cycles); err != nil {
 		return err
@@ -350,64 +355,55 @@ func writeV2Reads(buf *bytes.Buffer, reads *model.Reads) error {
 	if err := write("Index2Cycles", reads.Index2Cycles); err != nil {
 		return err
 	}
-	return nil
+	cw.Flush()
+	return cw.Error()
 }
 
 // writeV2Settings writes the [Settings] section as a 2-column CSV.
+// writeV2Settings writes the [Settings] section.
+//
+// Illumina's own sheets write the settings as "Key,Value" records, one
+// per line ("AdapterRead1,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"), and
+// the specification describes a standalone section the same way.
+//
+// The typed fields come first, then the Extra keys sorted. A key that
+// is already a record is skipped: the specification says the column
+// headers of a section must all be unique, and the typed field is the
+// one that holds the value.
 func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
-	// Collect keys in a stable order: typed fields first, then Extra
-	// keys sorted. A key that is already a column is skipped: the
-	// specification says the column headers of a section must all be
-	// unique, and the typed field is the one that holds the value.
-	keys := make([]string, 0, 2+len(s.Extra))
+	records := make([][]string, 0, 2+len(s.Extra))
 	seen := make(map[string]bool, 2+len(s.Extra))
-	add := func(key string) {
+	add := func(key, value string) {
 		lower := strings.ToLower(key)
 		if seen[lower] {
 			return
 		}
 		seen[lower] = true
-		keys = append(keys, key)
+		records = append(records, []string{key, value})
 	}
 	if s.Adapter != "" {
-		add("Adapter")
+		add("Adapter", s.Adapter)
 	}
 	if s.AdapterRead2 != "" {
-		add("AdapterRead2")
+		add("AdapterRead2", s.AdapterRead2)
 	}
-	if len(s.Extra) > 0 {
-		extra := make([]string, 0, len(s.Extra))
-		for k := range s.Extra {
-			extra = append(extra, k)
-		}
-		sort.Strings(extra)
-		for _, k := range extra {
-			add(k)
-		}
+	extra := make([]string, 0, len(s.Extra))
+	for k := range s.Extra {
+		extra = append(extra, k)
 	}
-	if len(keys) == 0 {
+	sort.Strings(extra)
+	for _, k := range extra {
+		add(k, s.Extra[k])
+	}
+	if len(records) == 0 {
 		return nil
 	}
 	cw := csv.NewWriter(buf)
 	cw.UseCRLF = false
-	if err := cw.Write(keys); err != nil {
-		return err
-	}
-	row := make([]string, len(keys))
-	for i, k := range keys {
-		var value string
-		switch {
-		case strings.EqualFold(k, "Adapter") && s.Adapter != "":
-			value = s.Adapter
-		case strings.EqualFold(k, "AdapterRead2") && s.AdapterRead2 != "":
-			value = s.AdapterRead2
-		default:
-			value = s.Extra[k]
+	for _, rec := range records {
+		if err := cw.Write([]string{csvSafe(rec[0]), csvSafe(rec[1])}); err != nil {
+			return err
 		}
-		row[i] = csvSafe(value)
-	}
-	if err := cw.Write(row); err != nil {
-		return err
 	}
 	cw.Flush()
 	return cw.Error()
