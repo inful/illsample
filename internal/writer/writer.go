@@ -342,13 +342,24 @@ func writeV2Reads(buf *bytes.Buffer, reads *model.Reads) error {
 // writeV2Settings writes the [Settings] section as a 2-column CSV.
 func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
 	// Collect keys in a stable order: typed fields first, then Extra
-	// keys sorted.
+	// keys sorted. A key that is already a column is skipped: the
+	// specification says the column headers of a section must all be
+	// unique, and the typed field is the one that holds the value.
 	keys := make([]string, 0, 2+len(s.Extra))
+	seen := make(map[string]bool, 2+len(s.Extra))
+	add := func(key string) {
+		lower := strings.ToLower(key)
+		if seen[lower] {
+			return
+		}
+		seen[lower] = true
+		keys = append(keys, key)
+	}
 	if s.Adapter != "" {
-		keys = append(keys, "Adapter")
+		add("Adapter")
 	}
 	if s.AdapterRead2 != "" {
-		keys = append(keys, "AdapterRead2")
+		add("AdapterRead2")
 	}
 	if len(s.Extra) > 0 {
 		extra := make([]string, 0, len(s.Extra))
@@ -356,7 +367,9 @@ func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
 			extra = append(extra, k)
 		}
 		sort.Strings(extra)
-		keys = append(keys, extra...)
+		for _, k := range extra {
+			add(k)
+		}
 	}
 	if len(keys) == 0 {
 		return nil
@@ -369,10 +382,10 @@ func writeV2Settings(buf *bytes.Buffer, s *model.Settings) error {
 	row := make([]string, len(keys))
 	for i, k := range keys {
 		var value string
-		switch k {
-		case "Adapter":
+		switch {
+		case strings.EqualFold(k, "Adapter") && s.Adapter != "":
 			value = s.Adapter
-		case "AdapterRead2":
+		case strings.EqualFold(k, "AdapterRead2") && s.AdapterRead2 != "":
 			value = s.AdapterRead2
 		default:
 			value = s.Extra[k]
