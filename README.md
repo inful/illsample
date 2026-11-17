@@ -223,11 +223,11 @@ sample_01,ATCGATCG,TTAA
 | Code | Severity | What it catches |
 |------|----------|-----------------|
 | `E_NIL_SHEET`               | error   | `Verify` was called with a nil sheet |
-- `E_V1_NO_DATA`              | error   | v1 sheet has no data rows |
-- `E_V1_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
-- `E_V1_MISSING_SAMPLE_NAME`  | error   | `Sample_Name` column missing |
-- `E_V1_MISSING_INDEX`        | error   | neither `index` nor `index2` present |
-- `E_V1_MISSING_SAMPLE_PROJECT` | error | `Sample_Project` column missing |
+| `E_V1_NO_DATA`              | error   | v1 sheet has no data rows |
+| `E_V1_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
+| `E_V1_MISSING_SAMPLE_NAME`  | error   | `Sample_Name` column missing |
+| `E_V1_MISSING_INDEX`        | error   | neither `index` nor `index2` present |
+| `E_V1_MISSING_SAMPLE_PROJECT` | error | `Sample_Project` column missing |
 | `E_V1_EMPTY_SAMPLE_ID`      | error   | a row has an empty `Sample_ID` |
 | `E_V1_DUPLICATE_SAMPLE_ID`  | error   | the same `Sample_ID` appears twice |
 | `E_V1_INVALID_INDEX`        | error   | index contains characters outside A/C/G/T/N |

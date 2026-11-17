@@ -385,6 +385,47 @@ func TestVerify_MiSeqColumnSpellings(t *testing.T) {
 	}
 }
 
+// TestReadmeRulesTable checks that the README's table of rules is a
+// table: every row starts with a pipe, and every code the rules can
+// produce is listed in it.
+func TestReadmeRulesTable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	readme := string(data)
+
+	// Every code a rule can produce must be in the table.
+	for _, rule := range allRules {
+		for _, format := range rule.formats {
+			code := issueCode(rule.severity, format, rule.suffix)
+			if !strings.Contains(readme, "`"+code+"`") {
+				t.Errorf("the README does not list %q", code)
+			}
+		}
+	}
+	if !strings.Contains(readme, "`E_NIL_SHEET`") {
+		t.Error("the README does not list E_NIL_SHEET")
+	}
+
+	// Every row of the table must be a table row: a line that starts
+	// with something else ends the table and leaves the rest of the
+	// rules unrendered.
+	inTable := false
+	for i, line := range strings.Split(readme, "\n") {
+		switch {
+		case strings.HasPrefix(line, "| Code |"):
+			inTable = true
+		case inTable && strings.HasPrefix(line, "|"):
+			// a table row
+		case inTable && strings.TrimSpace(line) == "":
+			inTable = false
+		case inTable:
+			t.Errorf("README line %d breaks the rules table: %q", i+1, line)
+		}
+	}
+}
+
 func TestVerify_DuplicateColumn(t *testing.T) {
 	// The section requirements say that the column headers must all be
 	// unique; a repeated name is ignored, so the first one wins.
