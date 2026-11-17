@@ -41,7 +41,7 @@ dialects.
 ### From source
 
 ```bash
-go install github.com/inful/illsample/cmd/illsample@v0.6.0
+go install github.com/inful/illsample/cmd/illsample@v0.6.1
 ```
 
 ### From a release
@@ -54,9 +54,9 @@ Windows). Grab the archive for your platform, extract it, and put the
 binary on your `PATH`.
 
 ```bash
-# Example: Linux amd64, release v0.6.0
+# Example: Linux amd64, release v0.6.1
 curl -L -o illsample.tar.gz \
-  https://github.com/inful/illsample/releases/download/v0.6.0/illsample_0.6.0_linux_amd64.tar.gz
+  https://github.com/inful/illsample/releases/download/v0.6.1/illsample_0.6.1_linux_amd64.tar.gz
 tar -xzf illsample.tar.gz
 sudo mv illsample /usr/local/bin/
 ```
