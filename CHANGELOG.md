@@ -7,6 +7,12 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.6.2] - 2026-11-17
 
 ### Fixed
+- A data row whose cell holds brackets is a row and not a section
+  header. The specification says that "there can only be one data item
+  in a section header line", so a header holds a name with no comma in
+  it; a row like `[],,,,` was read as a header with an empty name and
+  the sample was dropped without a word. Found by the writer's fuzz
+  target.
 - The v2 writer writes the `[Reads]` and `[Settings]` sections as
   `Key,Value` records, one per line. It wrote them in IEM's layouts —
   a key on a line of its own for `[Reads]`, and a header row plus a

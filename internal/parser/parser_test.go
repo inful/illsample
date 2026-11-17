@@ -987,3 +987,29 @@ func TestParseV2_SettingsSingleNameValuedRecord(t *testing.T) {
 		t.Errorf("Settings.Extra[SoftwareVersion] = %q, want x.y.z (settings: %+v)", got, sheet.Settings)
 	}
 }
+
+// TestParseV2_BracketedDataRowIsNotASectionHeader checks that a data
+// row whose cell holds brackets is a row and not a section header.
+//
+// The specification says that "there can only be one data item in a
+// section header line", so a header holds a name with no comma in it.
+// A row like "[],,,," is a sample whose identifier holds brackets --
+// invalid, but it must not be dropped without a word.
+func TestParseV2_BracketedDataRowIsNotASectionHeader(t *testing.T) {
+	for _, input := range []string{
+		"[Header]\nFileFormatVersion,2\n[Data]\nSample_ID\n[],\n",
+		"[Header]\nFileFormatVersion,2\n[Data]\nSample_ID\n[id1],[id2]\n",
+	} {
+		sheet, err := Parse(strings.NewReader(input))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		if len(sheet.Data) != 1 {
+			t.Errorf("input %q: len(Data) = %d, want 1", input, len(sheet.Data))
+			continue
+		}
+		if sheet.Data[0].SampleID == "" {
+			t.Errorf("input %q: the sample was dropped", input)
+		}
+	}
+}
