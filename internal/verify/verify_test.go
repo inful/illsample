@@ -639,3 +639,34 @@ func TestResultAccessors_PromoteWarnings(t *testing.T) {
 		t.Errorf("Errors() = %+v, want to contain W1", errs)
 	}
 }
+
+// FuzzVerify checks that the verifier never panics on a sheet the
+// parser accepts.
+//
+// The verifier runs on every sheet a user validates, so a panic in it
+// is a crash in their tool. The parser's fuzz target only parses, and
+// the writer's only writes, so the rules had no fuzz target of their
+// own.
+func FuzzVerify(f *testing.F) {
+	seeds := []string{
+		"",
+		"a,b,c\n1,2,3\n",
+		"Sample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCG,P1\n",
+		"[Header]\nFileFormatVersion,2\n[Data]\nSample_ID,index\nid1,ATCG\n[Reads]\nRead1Cycles,151\n",
+		"[Data]\nSample_ID,Sample_Name,index,Sample_Project\nid1,name1,ATCG,P1\n[Reads]\nRead1Cycles\n151\n",
+		"[Settings]\nSoftwareVersion,x.y.z\n",
+		"[Manifests]\nA,/p/a.csv\n",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		sheet, err := parser.Parse(strings.NewReader(input))
+		if err != nil {
+			return // a sheet that does not parse is not the verifier's problem
+		}
+		// The verifier must never panic.
+		Verify(sheet)
+		VerifyWithOptions(sheet, VerifyOptions{PromoteWarningsToErrors: true})
+	})
+}

@@ -280,10 +280,11 @@ Sample_ID,index,index2
 sample_01,ATCGATCG,TTAA
 ```
 
-- `[BCLConvert_Data]` is the data section, `[BCLConvert_Settings]` the
-  settings section, and `[Reads]` writes `Key,Value` on one line.
-- The writer always emits the IEM layout shown above, whatever the
-  source looked like.
+- `[BCLConvert_Data]` is the data section and `[BCLConvert_Settings]`
+  the settings section; `[Reads]` writes `Key,Value` on one line.
+- The writer emits the plain `[Data]`, `[Reads]`, `[Settings]` and
+  `[Manifests]` sections, whatever the source looked like: a
+  `[BCLConvert_Data]` section is written back as `[Data]`.
 
 ## Verification rules
 
@@ -304,7 +305,6 @@ sample_01,ATCGATCG,TTAA
 | `E_V1_LONG_SAMPLE_ID`       | error   | `Sample_ID` is longer than 100 characters |
 | `E_V2_NO_DATA`              | error   | `[Data]` section has no rows |
 | `E_V2_NO_HEADER`            | error   | `[Header]` section is missing |
-| `W_V2_NO_READS`             | warning | `[Reads]` section is missing |
 | `E_V2_MISSING_SAMPLE_ID`    | error   | `Sample_ID` column missing |
 | `E_V2_MISSING_INDEX`        | error   | `index` column missing |
 | `E_V2_READ1_MISSING`        | error   | `[Reads]` Read1Cycles not specified |
@@ -322,6 +322,7 @@ sample_01,ATCGATCG,TTAA
 | `W_V2_MISSING_SAMPLE_NAME`  | warning | `Sample_Name` column missing (optional in the v2 spec) |
 | `W_V2_MISSING_SAMPLE_PROJECT` | warning | `Sample_Project` column missing (optional in the v2 spec) |
 | `W_V2_NO_ADAPTER`           | warning | no `Adapter`/`AdapterRead1` sequence in the settings |
+| `W_V2_NO_READS`             | warning | `[Reads]` section is missing |
 | `W_V2_INCONSISTENT_PLATE_WELL` | warning | some rows have plate/well, others don't |
 | `W_V2_INCONSISTENT_INDEX_IDS` | warning | `I7_Index_ID` / `I5_Index_ID` only on some rows |
 | `W_V2_LONG_SAMPLE_NAME`     | warning | `Sample_Name` is over 100 characters |
@@ -363,7 +364,6 @@ send it, not just what the spec says:
   equivalent).
 - **A text preamble** before the first `[Section]` header is skipped, so a
   sheet that starts with a note is still recognised as v2.
-- **Column names** are case-insensitive.
 - **Comment lines** starting with `#` (or `//`) are ignored everywhere
   in v2 sheets.
 - **Empty `[Settings]`** and empty `[Manifests]` sections are treated
@@ -399,6 +399,7 @@ go test -race ./...
 # Run a quick fuzz pass.
 go test -fuzz=FuzzParse -fuzztime=10s ./internal/parser/
 go test -fuzz=FuzzWrite -fuzztime=10s ./internal/writer/
+go test -fuzz=FuzzVerify -fuzztime=10s ./internal/verify/
 
 # Check coverage.
 go test -coverprofile=coverage.out ./...

@@ -4,6 +4,21 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- A fuzz target for the verifier (`go test -fuzz=FuzzVerify
+  ./internal/verify/`). The verifier runs on every sheet a user
+  validates, so a panic in it is a crash in their tool; the parser's
+  fuzz target only parses and the writer's only writes, so the rules
+  had no fuzz target of their own.
+
+### Fixed
+- The README said that the writer "always emits the IEM layout". It
+  emits the plain `[Data]`, `[Reads]`, `[Settings]` and `[Manifests]`
+  sections, and a `[BCLConvert_Data]` section is written back as
+  `[Data]`.
+
 ## [0.6.5] - 2026-11-18
 
 ### Fixed
