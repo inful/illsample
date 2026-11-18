@@ -4,7 +4,7 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.6] - 2026-11-18
 
 ### Added
 - A fuzz target for the verifier (`go test -fuzz=FuzzVerify
@@ -384,7 +384,8 @@ the project adheres to [Semantic Versioning](https://semver.org/).
 - 100% statement coverage on the top-level package; 77% / 91% / 80%
   on the internal packages (parser / verify / writer).
 
-[Unreleased]: https://github.com/inful/illsample/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/inful/illsample/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/inful/illsample/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/inful/illsample/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/inful/illsample/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/inful/illsample/compare/v0.6.2...v0.6.3
