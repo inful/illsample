@@ -4,6 +4,15 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- A sample whose identifier is a single bracketed word is a sample.
+  Every instruction line in Illumina's template reads like a sentence
+  ("<Enter analysis settings for demultiplexing...>"), and a line whose
+  content is one word is a value. A row that held nothing but such a
+  word was dropped without a word.
+
 ## [0.6.4] - 2026-11-18
 
 ### Fixed

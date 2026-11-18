@@ -279,13 +279,16 @@ func isBlankLine(s string) bool {
 // template says to delete them before uploading a sheet, but a sheet
 // that still holds them must parse.
 //
-// shortcut: a line that is nothing but a bracketed word is read as an
-// instruction. A data row whose only cell is "<control>" would be
-// skipped; upgrade by only skipping the lines that start with "<"
-// and are longer than a word.
+// The content between the brackets must be a phrase rather than a
+// single word: every instruction line in Illumina's template reads
+// like a sentence, and a single bracketed word is a value. A row that
+// holds nothing but such a word is a sample.
 func isInstructionLine(s string) bool {
 	s = strings.TrimRight(strings.TrimSpace(s), ",")
-	return len(s) >= 2 && strings.HasPrefix(s, "<") && strings.HasSuffix(s, ">")
+	if len(s) < 2 || !strings.HasPrefix(s, "<") || !strings.HasSuffix(s, ">") {
+		return false
+	}
+	return strings.ContainsAny(s[1:len(s)-1], " \t")
 }
 
 // csvRecord is one parsed CSV row. It exists to keep call sites concise.

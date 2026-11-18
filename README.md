@@ -373,7 +373,11 @@ send it, not just what the spec says:
 - **A section label may be padded with commas** (`[Header],,,,,,`), and
   so may the records below it (`RunName,MyRun,,,`).
 - **The instruction lines of Illumina's v2 template** (the ones in
-  angle brackets) are skipped, so the template parses as it is.
+  angle brackets) are skipped, so the template parses as it is. They
+  are not part of the format — Illumina's own template says *"Delete
+  all angle brackets (< >) and their contents before uploading"* — and
+  a line whose content is a single bracketed word is a value, not an
+  instruction.
 - **Column names** are case-insensitive, and surrounding whitespace is
   trimmed, so `" Notes"` and `Notes` are the same column. The
   identifier column may be spelled `Sample_ID` or `SampleID`, as
