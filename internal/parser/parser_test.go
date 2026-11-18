@@ -1015,3 +1015,25 @@ func TestParseV2_BracketedDataRowIsNotASectionHeader(t *testing.T) {
 		}
 	}
 }
+
+// TestParseV2_SingleWordBracketsIsNotAnInstruction checks that a
+// sample whose identifier is a single bracketed word is a sample.
+//
+// Every instruction line in Illumina's template reads like a sentence
+// ("<Enter analysis settings for demultiplexing...>"), and a single
+// bracketed word is a value. The row holds nothing else, so the line
+// ends with the bracket.
+func TestParseV2_SingleWordBracketsIsNotAnInstruction(t *testing.T) {
+	input := "[Header]\nFileFormatVersion,2\n" +
+		"[Data]\nSample_ID\n<control>\n"
+	sheet, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(sheet.Data) != 1 {
+		t.Fatalf("len(Data) = %d, want 1", len(sheet.Data))
+	}
+	if sheet.Data[0].SampleID != "<control>" {
+		t.Errorf("SampleID = %q, want <control>", sheet.Data[0].SampleID)
+	}
+}
