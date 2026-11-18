@@ -819,6 +819,8 @@ func TestUnescapeCSVSafe(t *testing.T) {
 		{"'@SUM(A1:A10)", "@SUM(A1:A10)"},
 		{"'\tleading-tab", "\tleading-tab"},
 		{"'\rleading-cr", "\rleading-cr"},
+		{"'[0]", "[0]"},
+		{"'<control>", "<control>"},
 		// Legitimate leading quote survives.
 		{"'twas the night", "'twas the night"},
 		{"'normal", "'normal"},

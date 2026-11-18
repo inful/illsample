@@ -498,12 +498,21 @@ func fieldFor(sample model.Sample, col string) string {
 // the original value.
 //
 // Reference: OWASP "CSV Injection".
+// csvSafe escapes a value that something else would read as more than
+// a value.
+//
+// A leading "=", "+", "-", "@", tab or carriage return starts a
+// formula in a spreadsheet. A leading "[" starts a section header in
+// a sample sheet and a leading "<" starts one of the instruction
+// lines that Illumina's template puts between its sections: a row
+// that holds nothing else would be read as one of those, and the
+// sample lost without a word. The reader strips the escape again.
 func csvSafe(s string) string {
 	if s == "" {
 		return s
 	}
 	switch s[0] {
-	case '=', '+', '-', '@', '\t', '\r':
+	case '=', '+', '-', '@', '\t', '\r', '[', '<':
 		return "'" + s
 	}
 	return s

@@ -139,14 +139,15 @@ func stripBOM(b []byte) string {
 // unescapeCSVSafe reverses the writer's csvSafe escape on read. The
 // writer prepends a single quote to any cell whose first byte is one
 // of the spreadsheet-formula triggers ('=', '+', '-', '@', '\t',
-// '\r'); this strips that prefix back off so a parse → write → parse
+// '\r') or would start a section header or an instruction line ('[',
+// '<'); this strips that prefix back off so a parse → write → parse
 // round-trip is lossless. Cells whose second character is not in the
 // trigger set are returned unchanged, so a legitimate leading quote
 // (e.g. "'twas the night") survives.
 func unescapeCSVSafe(s string) string {
 	if len(s) >= 2 && s[0] == '\'' {
 		switch s[1] {
-		case '=', '+', '-', '@', '\t', '\r':
+		case '=', '+', '-', '@', '\t', '\r', '[', '<':
 			return s[1:]
 		}
 	}

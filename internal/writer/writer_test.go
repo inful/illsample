@@ -882,3 +882,39 @@ func TestWriteV2_StandaloneSectionsUseKeyValuePairs(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteV2_RowThatLooksLikeASectionHeader checks that a sample
+// whose identifier starts with a bracket survives the round trip.
+//
+// A row that starts with "[" and holds nothing else is read back as a
+// section header, and a row that starts with "<" is read back as one
+// of the instruction lines that Illumina's template puts between its
+// sections. The specification forbids brackets in values, so the
+// writer escapes them the way it escapes a value that a spreadsheet
+// would read as a formula.
+func TestWriteV2_RowThatLooksLikeASectionHeader(t *testing.T) {
+	for _, id := range []string{"[0]", "[]", "[id1]", "<control>", "<Enter here>"} {
+		sheet := &model.SampleSheet{
+			Format: model.FormatV2,
+			Header: map[string]string{"FileFormatVersion": "2"},
+			Data: []model.Sample{
+				{SampleID: id},
+			},
+		}
+		var buf bytes.Buffer
+		if err := WriteV2(&buf, sheet); err != nil {
+			t.Fatalf("WriteV2: %v", err)
+		}
+		round, err := parser.Parse(&buf)
+		if err != nil {
+			t.Fatalf("Parse round-trip: %v\nwritten:\n%s", err, buf.String())
+		}
+		if len(round.Data) != 1 {
+			t.Errorf("id %q: len(Data) = %d, want 1\nwritten:\n%s", id, len(round.Data), buf.String())
+			continue
+		}
+		if round.Data[0].SampleID != id {
+			t.Errorf("id %q: round-trip SampleID = %q\nwritten:\n%s", id, round.Data[0].SampleID, buf.String())
+		}
+	}
+}
