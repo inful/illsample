@@ -4,7 +4,18 @@ All notable changes to `illsample` are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 the project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.6.2] - 2026-11-17
+## [Unreleased]
+
+### Fixed
+- A sample whose identifier starts with a bracket or an angle bracket
+  and holds no other value survives the round trip. The writer escapes
+  such a value the way it escapes a value a spreadsheet would read as
+  a formula: a row that starts with `[` is read back as a section
+  header, and a row that starts with `<` as one of the instruction
+  lines that Illumina's template puts between its sections, so the
+  sample was lost without a word. Found by the writer's fuzz target.
+
+## [0.6.3] - 2026-11-17
 
 ### Fixed
 - A data row whose cell holds brackets is a row and not a section
@@ -13,6 +24,10 @@ the project adheres to [Semantic Versioning](https://semver.org/).
   it; a row like `[],,,,` was read as a header with an empty name and
   the sample was dropped without a word. Found by the writer's fuzz
   target.
+
+## [0.6.2] - 2026-11-17
+
+### Fixed
 - The v2 writer writes the `[Reads]` and `[Settings]` sections as
   `Key,Value` records, one per line. It wrote them in IEM's layouts —
   a key on a line of its own for `[Reads]`, and a header row plus a
