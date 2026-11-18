@@ -5,7 +5,7 @@
 #   make test          Run all tests with the race detector
 #   make cover         Print a coverage summary
 #   make cover-html    Write an HTML coverage report to coverage.html
-#   make fuzz          Run a short fuzz pass on the parser
+#   make fuzz          Run a short fuzz pass on the parser, writer and verifier
 #   make vet           Run go vet
 #   make fmt           Run gofmt
 #   make clean         Remove build artifacts
@@ -43,6 +43,7 @@ cover-html:
 fuzz:
 	$(GO) test -fuzz=FuzzParse -fuzztime=10s ./internal/parser/
 	$(GO) test -fuzz=FuzzWrite -fuzztime=10s ./internal/writer/
+	$(GO) test -fuzz=FuzzVerify -fuzztime=10s ./internal/verify/
 
 vet:
 	$(GO) vet ./...
@@ -62,7 +63,7 @@ help:
 	@echo "  test          Run all tests with -race"
 	@echo "  cover         Print coverage summary"
 	@echo "  cover-html    Write HTML coverage report"
-	@echo "  fuzz          Run parser fuzz for 10s"
+	@echo "  fuzz          Run parser, writer and verifier fuzz for 10s"
 	@echo "  vet           Run go vet"
 	@echo "  fmt           Run gofmt"
 	@echo "  clean         Remove build artifacts"
